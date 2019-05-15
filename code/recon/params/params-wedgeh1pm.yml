@@ -1,0 +1,25 @@
+mods:
+    objective : SmoothedFourierWedgeObjective
+    map : mapbias
+    kmin : 0.01
+    angle : 50
+
+basep:
+    bs : 256
+    nc : 128
+    seed : 100
+    nsteps : 5
+    B : 1
+    aa : 0.3333
+    pmdisp : True
+    numd : -1
+    noisevar : 0.01
+    rsdpos: False
+
+init: 
+    sinit: null
+    #sinit: '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_0.3333/wedge_kmin0.01_ang50.0/L0256-N0128/T05-B1/opt_s999_h1massA_fourier_rsdpos/128-1.00/0020/fit_p'
+    nit : 20
+    sml : 1.0
+    sms : [4.0, 2.0, 1.0, 0.5, 0.0]
+    #sms : [1.0, 0.5, 0.0]
