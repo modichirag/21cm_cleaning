@@ -22,17 +22,18 @@ atoz = lambda a: 1/a-1
 zzfiles = [round(atoz(aa), 2) for aa in aafiles]
 
 #Paramteres
-#Maybe set up to take in as args file?
-bs, nc = 256, 256
-ncsim, sim, prefix = 256, 'lowres/%d-9100-fixed'%256, 'lowres'
-ncsim, sim, prefix = 2560, 'highres/%d-9100-fixed'%2560, 'highres'
+bs, nc = 256, 128               # nc is the cube_size here
+
+#ncsim, sim, prefix = 256, 'lowres/%d-9100-fixed'%256, 'lowres'
+#ncsim, sim, prefix = 2560, 'highres/%d-9100-fixed'%2560, 'highres'
+ncsim, sim, prefix = int(2560/2), 'highres/%d-9100-fixed'%2560, 'highres'
 
 
 
 
 if __name__=="__main__":
 
-    cube_size = 256
+    cube_size = nc
     shift = cube_size
     ncube = int(ncsim/shift)
     cube_length = cube_size*bs/ncsim
@@ -49,7 +50,7 @@ if __name__=="__main__":
     comm = pm.comm
 
 
-    savepath = myscratch +  sim + '/fastpm_%0.4f/voxels-%d/'%(aa, cube_size)
+    savepath = myscratch +  sim + '/fastpm_%0.4f/voxels-%d_%04d/'%(aa, cube_size, ncsim)
     try: 
         os.makedirs(savepath)
     except: pass
@@ -57,10 +58,10 @@ if __name__=="__main__":
     pmsmall = ParticleMesh(BoxSize = bs/ncube, Nmesh = [cube_size, cube_size, cube_size], dtype=np.float32, comm=MPI.COMM_SELF)
     gridsmall = pmsmall.generate_uniform_particle_grid(shift=0)
 
-    dataset = ['HI', 'kpar%dp%d'%(int(kmin), kmin*10), 'kpar%dp%d-R%dp%d'%(int(kmin), (kmin*10)%10, int(R), (R*10)%10)]
+    dataset = ['HI', 'HI-R%dp%d'%(int(R), (R*10)%10), 'kpar%dp%d'%(int(kmin), kmin*10), 'kpar%dp%d-R%dp%d'%(int(kmin), (kmin*10)%10, int(R), (R*10)%10)]
     meshes = []
     vals = []
-    for i in range(3):
+    for i in range(len(dataset)):
         meshes.append(BigFileMesh(path, dataset=dataset[i], mode='real').paint())
         #vals.append(meshes[i].readout(grid, resampler = 'nearest', layout=layout).astype(np.float32))
     #mesh = BigFileMesh(path, dataset='HI', mode='real').paint()
@@ -91,7 +92,7 @@ if __name__=="__main__":
         layout = pm.decompose(poslarge)
         if rank == 0 : print(rank, 'Layout decomposed')
 
-        for i in range(3):
+        for i in range(len(dataset)):
             vals = meshes[i].readout(poslarge, layout=layout, resampler='nearest').astype(np.float32)
             if save:
                 savemesh = pmsmall.paint(gridsmall, mass = vals, resampler='nearest')

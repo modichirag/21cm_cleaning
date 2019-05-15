@@ -22,8 +22,8 @@ zzfiles = [round(atoz(aa), 2) for aa in aafiles]
 
 #Paramteres
 #Maybe set up to take in as args file?
-bs, nc = 256, 256
-ncsim, sim, prefix = 256, 'lowres/%d-9100-fixed'%256, 'lowres'
+bs, nc = 256, int(2560/2)
+#ncsim, sim, prefix = 256, 'lowres/%d-9100-fixed'%256, 'lowres'
 ncsim, sim, prefix = 2560, 'highres/%d-9100-fixed'%2560, 'highres'
 
 pm = ParticleMesh(BoxSize = bs, Nmesh = [nc, nc, nc])
@@ -105,6 +105,7 @@ def savemesh(aa, bs=bs, nc=nc, kmin=0.1, R=1, savecat=False):
     hcat = assignHImass(aa, save=savecat)
     #mesh = pm.paint(hcat['Position'], mass=hcat['HImass'])
     mesh  = hcat.to_mesh(BoxSize=bs,Nmesh=[nc,nc,nc], position='Position',value='HImass').to_real_field()
+    meshG = mesh.r2c().apply(lambda k, v: v*np.exp(-sum(ki**2 for ki in k)*R**2)).c2r()
     path = myscratch +  sim + '/fastpm_%0.4f/'%aa + '/HImesh_N%04d'%(nc)
     try : os.make_dirs(path)
     except: pass
@@ -113,6 +114,8 @@ def savemesh(aa, bs=bs, nc=nc, kmin=0.1, R=1, savecat=False):
     
     mesh = FieldMesh(mesh)
     mesh.save(path, dataset='HI', mode='real')
+    meshG = FieldMesh(meshG)
+    meshG.save(path, dataset='HI-R%dp%d'%(int(R), (R*10)%10), mode='real')
 
     meshkpar = FieldMesh(meshkpar)
     dataset ='kpar%dp%d'%(int(kmin), kmin*10) # 
@@ -129,4 +132,4 @@ if __name__=="__main__":
 
     for aa in aafiles[:]:
         if rank == 0: print(aa)
-        savemesh(aa, nc=ncsim, savecat=True)
+        savemesh(aa, nc=nc, savecat=True)
