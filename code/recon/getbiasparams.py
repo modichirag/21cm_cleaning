@@ -12,13 +12,29 @@ def diracdelta(i, j):
     if i == j: return 1
     else: return 0
 
-def shear(pm, base):          
+#def shear(pm, base):          
+#    '''Takes in a PMesh object in real space. Returns am array of shear'''          
+#    s2 = pm.create(mode='real', value=0)                                                  
+#    kk = base.r2c().x
+#    k2 = sum(ki**2 for ki in kk)                                                                          
+#    k2[0,0,0] = 1  
+#    for i in range(3):
+#        for j in range(i, 3):                                                       
+#            basec = base.r2c()
+#            basec *= (kk[i]*kk[j] / k2 - diracdelta(i, j)/3.)              
+#            baser = basec.c2r()                                                                
+#            s2[...] += baser**2                                                        
+#            if i != j:                                                              
+#                s2[...] += baser**2                                                    
+#    return s2  
+#
+
+def shear(pm, base):                                                                                                                                          
     '''Takes in a PMesh object in real space. Returns am array of shear'''          
     s2 = pm.create(mode='real', value=0)                                                  
     kk = base.r2c().x
     k2 = sum(ki**2 for ki in kk)                                                                          
-    print(pm.comm.rank, k2.shape)
-    k2[0,0,0] = 1  
+    k2[0,0,0] =  1                                                                  
     for i in range(3):
         for j in range(i, 3):                                                       
             basec = base.r2c()
@@ -27,20 +43,23 @@ def shear(pm, base):
             s2[...] += baser**2                                                        
             if i != j:                                                              
                 s2[...] += baser**2                                                    
+                                                                                    
     return s2  
 
 
-def getbias(pm, hmesh, basemesh, pos, grid, doed=False):
+
+def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None):
 
     if pm.comm.rank == 0: print('Will fit for bias now')
 
-#    d0 = basemesh.copy()
-#    d2 = 1.*basemesh**2
-#    d2 -= d2.cmean()
-#    s2 = shear(pm, basemesh)
-#    s2 -= 1.*basemesh**2
-#    s2 -= s2.cmean()
-    d0, d2, s2 = basemesh
+    try: d0, d2, s2 = basemesh
+    except:
+        d0 = basemesh.copy()
+        d2 = 1.*basemesh**2
+        d2 -= d2.cmean()
+        s2 = shear(pm, basemesh)
+        s2 -= 1.*basemesh**2
+        s2 -= s2.cmean()
 
     ph = FFTPower(hmesh, mode='1d').power['power']
 
@@ -93,7 +112,14 @@ def getbias(pm, hmesh, basemesh, pos, grid, doed=False):
 
     if pm.comm.rank == 0: print('\nBias fit params are : ', b1, b2, bs2)
     
-    mod = b1*ed0 + b2*ed2 + bs2*es2
+    if fpos is not None:
+        glay, play = pm.decompose(grid), pm.decompose(fpos)
+        ed0 = pm.paint(fpos, mass=d0.readout(grid, layout = glay, resampler='nearest'), layout=play)
+        ed2 = pm.paint(fpos, mass=d2.readout(grid, layout = glay, resampler='nearest'), layout=play)
+        es2 = pm.paint(fpos, mass=s2.readout(grid, layout = glay, resampler='nearest'), layout=play)
+        mod = b1*ed0 + b2*ed2 + bs2*es2
+    else:
+        mod = b1*ed0 + b2*ed2 + bs2*es2
     if doed: mod += ed
     
     return params, mod
@@ -135,4 +161,4 @@ def eval_bfit(hmesh, mod, ofolder, noise=None, title=None, fsize=15):
 
     plt.close()
 
-    return k, perr
+    return k, perr.real

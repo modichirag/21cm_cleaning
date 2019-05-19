@@ -1,3 +1,9 @@
+import warnings
+from mpi4py import MPI
+rank = MPI.COMM_WORLD.rank
+#warnings.filterwarnings("ignore")
+if rank!=0: warnings.filterwarnings("ignore")
+
 import numpy
 from scipy.interpolate import InterpolatedUnivariateSpline as interpolate
 from scipy.interpolate import interp1d 
@@ -20,6 +26,12 @@ sys.path.append('../')
 sys.path.append('../utils/')
 import HImodels
 
+
+klin, plin = numpy.loadtxt('../../data/pklin_1.0000.txt', unpack = True)
+ipk = interpolate(klin, plin)
+#cosmo = Planck15.clone(Omega_cdm = 0.2685, h = 0.6711, Omega_b = 0.049)
+cosmodef = {'omegam':0.309167, 'h':0.677, 'omegab':0.048}
+cosmo = Cosmology.from_dict(cosmodef)
 
 #########################################
 
@@ -50,8 +62,10 @@ ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/we
 if pmdisp: 
     ofolder += 'T%02d-B%01d/'%(nsteps, B)
 else: ofolder += 'ZA/'
-prefix = '_fourier'
-if rsdpos: prefix += "_rsdpos"
+if prefix is None:
+    prefix = '_fourier_rtol'
+    if rsdpos: prefix += "_rsdpos"
+
 fname = 's999_h1massA%s'%prefix
 optfolder = ofolder + 'opt_%s/'%fname
 if truth_pm.comm.rank == 0: print('Output Folder is %s'%optfolder)
@@ -62,15 +76,8 @@ for folder in [ofolder, optfolder]:
     except:pass
 
 
+####################################
 #initiate
-
-klin, plin = numpy.loadtxt('../../data/pklin_1.0000.txt', unpack = True)
-ipk = interpolate(klin, plin)
-#cosmo = Planck15.clone(Omega_cdm = 0.2685, h = 0.6711, Omega_b = 0.049)
-cosmodef = {'omegam':0.309167, 'h':0.677, 'omegab':0.048}
-cosmo = Cosmology.from_dict(cosmodef)
-
-
 
 if rsdpos:
     hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImeshz-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
@@ -81,6 +88,8 @@ if rsdpos:
 else: 
     hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImesh-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
     rsdfac = 0
+rsdfac *= 100./aa ##Add hoc factor due to incorrect velocity dimensions in nbody.py
+
 
 hmesh /= hmesh.cmean()
 hmesh -= 1.
@@ -97,7 +106,7 @@ if rank == 0 : print('Noise : ', noise)
 
 #########################################
 #dynamics
-stages = numpy.linspace(0.1, aa, nsteps, endpoint=True)
+stages = numpy.linspace(0.01, aa, nsteps, endpoint=True)
 if pmdisp: dynamic_model = NBodyModel(cosmo, truth_pm, B=B, steps=stages)
 else: dynamic_model = ZAModel(cosmo, truth_pm, B=B, steps=stages)
 if rank == 0: print(dynamic_model)
@@ -109,33 +118,40 @@ truth_noise_model = None
 
 #Create and save data if not found
 
-dyn = BigFileCatalog(dfolder + 'fastpm_%0.4f/1'%aa)
 s_truth = BigFileMesh(dfolder + 'linear', 'LinearDensityK').paint()
-mock_model_setup = map.MockModel(dynamic_model, rsdpos=rsdpos, rsdfac=rsdfac)
-fpos, linear, linearsq, shear = mock_model_setup.get_code().compute(['x', 'linear', 'linearsq', 'shear'], init={'parameters': s_truth})
-grid = truth_pm.generate_uniform_particle_grid(shift=0.0, dtype='f4')
-params, bmod = getbias(truth_pm, hmesh, [linear, linearsq, shear], fpos, grid)
-title = ['%0.3f'%i for i in params]
-kerror, perror = eval_bfit(hmesh, bmod, optfolder, noise=noise, title=title, fsize=15)
+dyn = BigFileCatalog(dfolder + 'fastpm_%0.4f/1'%aa)
+dlayout = truth_pm.decompose(dyn['Position'])
+d_truth = truth_pm.paint(dyn['Position'], layout=dlayout)
+
+try: 
+    params = numpy.loadtxt(optfolder + '/params.txt')
+    kerror, perror = numpy.loadtxt(optfolder + '/error_ps.txt', unpack=True)
+except Exception as e:
+    mock_model_setup = map.MockModel(dynamic_model, rsdpos=rsdpos, rsdfac=rsdfac)
+    fpos, linear, linearsq, shear = mock_model_setup.get_code().compute(['xp', 'linear', 'linearsq', 'shear'], init={'parameters': s_truth})
+    grid = truth_pm.generate_uniform_particle_grid(shift=0.0, dtype='f4')
+    params, bmod = getbias(truth_pm, hmesh, [linear, linearsq, shear], fpos, grid)
+    title = ['%0.3f'%i for i in params]
+    kerror, perror = eval_bfit(hmesh, bmod, optfolder, noise=noise, title=title, fsize=15)
+    if rank == 0: 
+        numpy.savetxt(optfolder + '/params.txt', params, header='b1, b2, bsq')
+        numpy.savetxt(optfolder + '/error_ps.txt', numpy.array([kerror, perror]).T, header='kerror, perror')
+
 ipkerror = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
-
 mock_model = map.MockModel(dynamic_model, params=params, rsdpos=rsdpos, rsdfac=rsdfac)
-data_p = mock_model.make_observable(s_truth)
-data_p.mapp = hmesh.copy()
-data_p.save(optfolder+'datap/')
-if rank == 0: print('datap saved')
 
-#data_n = truth_noise_model.add_noise(data_p)
-#data_n.save(optfolder+'datan/')
-#if rank == 0: print('datan saved')
+try: data_p = map.Observable.load(optfolder+'/datap')
+except: 
+    data_p = map.Observable(hmesh, d_truth, s_truth)
+    data_p.save(optfolder+'datap/')
 
-fit_p = mock_model.make_observable(s_truth)
-fit_p.save(optfolder+'fitp/')
-if rank == 0: print('fitp saved')
+try: fitp_p = map.Observable.load(optfolder+'/fitp')
+except:
+    fit_p = mock_model.make_observable(s_truth)
+    fit_p.save(optfolder+'fitp/')
 
-##########
 
-if rank == 0: print('data_p, data_n created')
+if rank == 0: print('Setup done')
 
 #########################################
 #Optimizer  
@@ -157,12 +173,67 @@ for Ns in sms:
     if truth_pm.comm.rank == 0: print('\nDo for cell smoothing of %0.2f\n'%(Ns))
     #x0 = solve(N0, x0, 0.005, '%d-%0.2f'%(N0, Ns), Ns)
     sml = C * Ns
-    rtol = 0.005
+    rtol = 0.01
+    maxiter = 100
     run = '%d-%0.2f'%(N0, Ns)
     if Ns == sms[0]:
-        if cfg['init']['sinit'] is not None: run += '-nit_%d-sm_%.2f'%(cfg['init']['nit'], cfg['init']['sml'])
-    #obj = objectives.SmoothedFourierObjective(mock_model, truth_noise_model, data_p, prior_ps=ipk, error_ps=ipkerror, sml=sml)
-    obj = objfunc(mock_model, truth_noise_model, data_p, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle)
-    x0 = solve(N0, x0, rtol, run, Ns, prefix, mock_model, obj, data_p, truth_pm, optfolder, saveit=20, showit=5, title=None)    
+        if cfg['init']['sinit'] is not None: 
+            run += '-nit_%d-sm_%.2f'%(cfg['init']['nit'], cfg['init']['sml'])
+            maxiter -= int(cfg['init']['nit'])
+    if maxiter > 0:
+        obj = objfunc(mock_model, truth_noise_model, data_p, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle)
+        x0 = solve(N0, x0, rtol, run, Ns, prefix, mock_model, obj, data_p, truth_pm, optfolder, \
+               saveit=20, showit=5, title=None, maxiter=maxiter)    
 
-
+##
+###################################################################################
+#####Upsample
+##
+##try:
+##    if cfg['upsample']:
+##        if rank == 0: print('\nUpsampling\n')
+##        new_pm = ParticleMesh(BoxSize=truth_pm.BoxSize, Nmesh=truth_pm.Nmesh*2, dtype='f4')
+##        s_init = new_pm.upsample(x0, keep_mean=True)
+##        if rsdpos:
+##            hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImeshz-N%04d/'%(bs*10, aa, nc*2), 'ModelA').paint()
+##        else: 
+##            hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImesh-N%04d/'%(bs*10, aa, nc*2), 'ModelA').paint()
+##        hmesh /= hmesh.cmean()
+##        hmesh -= 1.
+##
+##        if pmdisp: dynamic_model = NBodyModel(cosmo, new_pm, B=B, steps=stages)
+##        else: dynamic_model = ZAModel(cosmo, new_pm, B=B, steps=stages)
+##
+##        dnewfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100-fixed/'%(nsteps, B, bs, nc*2)
+##        s_truth = BigFileMesh(dnewfolder + 'linear', 'LinearDensityK').paint()
+##        dyn = BigFileCatalog(dnewfolder + 'fastpm_%0.4f/1'%aa)
+##        dlayout = new_pm.decompose(dyn['Position'])
+##        d_truth = new_pm.paint(dyn['Position'], layout=dlayout)
+##
+##        mock_model = map.MockModel(dynamic_model, params=params, rsdpos=rsdpos, rsdfac=rsdfac)
+##        truth_noise_model = None
+##        data_p = map.Observable(hmesh, d_truth, s_truth)
+##        data_p.save(optfolder+'datap_up/')
+##        if rank == 0: print('datap saved')      
+##
+##        fit_p = mock_model.make_observable(s_truth)
+##        fit_p.save(optfolder+'fitp_up/')
+##        if rank == 0: print('fitp saved')
+##
+##        x0 = s_init
+##        N0 = nc*2
+##        C = x0.BoxSize[0] / x0.Nmesh[0]
+##        rtol = 0.005
+##        maxiter = 100
+##
+##        for Ns in [1, 0]:
+##            sml = C * Ns
+##            run = '%d-%0.2f'%(N0, Ns)
+##            obj = objfunc(mock_model, truth_noise_model, data_p, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle)
+##            x0 = solve(N0, x0, rtol, run, Ns, prefix, mock_model, obj, data_p, new_pm, optfolder + '/upsample/', \
+##                       saveit=20, showit=5, title=None, maxiter=maxiter)    
+##        print('\nFinished After Upsampling\n')
+##
+##except Exception as e:
+##    print(e)
+##    if rank == 0: print('\nFinished\n')
