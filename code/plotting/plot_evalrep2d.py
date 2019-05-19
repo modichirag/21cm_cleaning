@@ -67,9 +67,11 @@ def make_rep_plot():
     print(noise)
 
     datap = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier/datap')
-    datapup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier/datap_up')
     dataprsd = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap')
-    dataprsdup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap_up')
+    try:
+        datapup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier/datap_up')
+        dataprsdup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap_up')
+    except Exception as e: print(e)
 
     fig, ax = plt.subplots(2, 2, figsize=(9, 9), sharex=True, sharey=True)
 
@@ -81,9 +83,6 @@ def make_rep_plot():
             axis = ax.flatten()[i]
             if i : lbl = None
             rcc = rpfit[0]['power'][:, i]/(rpfit[3]['power'][:, i]*rpfit[4]['power'][:, i])**0.5
-            if rcc[5:10].mean() < 0:
-                rcc *= -1
-                print('\nWARNING :: Negative cross correlation\n')
             axis.plot(k, rcc, ls=lss, lw=lww, color=cc, label=lbl)
             axis.text(0.1, 0.6, r'$\mu = %.2f$'%mus[i],color='black',ha='left',va='bottom', fontdict=font)
 

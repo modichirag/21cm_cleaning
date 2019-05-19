@@ -417,19 +417,20 @@ def evaluate2d(model, data, M0=0, kmin=None, dk=None, Nmu=5, retmesh=False, los=
     else: modmappmean = 1.
     if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
     else: datmappmean = 1.
+    modmappmean, datmappmean = 1., 1.
         
-    xm = FFTPower(first=FieldMesh(model.mapp/model.mapp.cmean()), 
-                  second=FieldMesh(data.mapp/data.mapp.cmean()), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+    xm = FFTPower(first=FieldMesh(model.mapp/modmappmean), 
+                  second=FieldMesh(data.mapp/datmappmean), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
     xd = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='2d', kmin=kmin, dk=dk, 
                   Nmu=Nmu, los=[0, 0, 1])
     xs = FFTPower(first=FieldMesh(model.s), second=FieldMesh(data.s), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, 
                   los=[0, 0, 1])
 
-    pm1 = FFTPower(first=FieldMesh(model.mapp/model.mapp.cmean()), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+    pm1 = FFTPower(first=FieldMesh(model.mapp/modmappmean), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
     pd1 = FFTPower(first=FieldMesh(model.d), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
     ps1 = FFTPower(first=FieldMesh(model.s), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
 
-    pm2 = FFTPower(first=FieldMesh(data.mapp/data.mapp.cmean()), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+    pm2 = FFTPower(first=FieldMesh(data.mapp/datmappmean), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
     pd2 = FFTPower(first=FieldMesh(data.d), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
     ps2 = FFTPower(first=FieldMesh(data.s), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
 

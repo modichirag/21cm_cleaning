@@ -67,9 +67,11 @@ def make_rep_plot():
     print(noise)
 
     datap = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier/datap')
-    datapup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier/datap_up')
     dataprsd = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap')
-    dataprsdup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap_up')
+    try:
+        datapup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier/datap_up')
+        dataprsdup = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap_up')
+    except Exception as e: print(e)
 
     fig, ax = plt.subplots(1, 2, figsize=(9, 4))
 
@@ -142,7 +144,7 @@ def make_rep_plot():
         print(path)
         bfit = mapp.Observable.load(path)
         datapp = dataprsdup
-        lss, lww, cc, lbl = '--', 2, 'C1', None
+        lss, lww, cc, lbl = '--', 2, 'C1', 'rsd up'
         makeplot(bfit, datapp, lss, lww, cc, lbl)
         print('%s done'%lbl)
     except Exception as e: print(e)
@@ -155,7 +157,7 @@ def make_rep_plot():
         print(path)
         bfit = mapp.Observable.load(path)
         datapp = dataprsdup
-        lss, lww, cc, lbl = '--', 2, 'C2', None
+        lss, lww, cc, lbl = '--', 2, 'C2', 'rsd up2'
         makeplot(bfit, datapp, lss, lww, cc, lbl)
         print('%s done'%lbl)
     except Exception as e: print(e)
