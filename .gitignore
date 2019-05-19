@@ -2,6 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*/log_slurm/*
+*/scripts/*
+*/params/*
+*/log_slurm
+*/scripts
+*/params
 
 # C extensions
 *.so

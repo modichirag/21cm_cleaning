@@ -21,10 +21,16 @@ def evaluate(model, data, M0=0, stoch=False, kmin=None, dk=None):
     data.mapp += M0
 
 
+    #print('Means are : ', model.mapp.cmean(), data.mapp.cmean())
     if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
     else: modmappmean = 1.
     if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
     else: datmappmean = 1.
+    modmappmean, datmappmean = 1., 1.
+    #if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
+    #else: modmappmean = 1.
+    #if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
+    #else: datmappmean = 1.
         
     xm = FFTPower(first=FieldMesh(model.mapp/modmappmean), second=FieldMesh(data.mapp/datmappmean), mode='1d', kmin=kmin, dk=dk)
     xd = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
@@ -407,6 +413,11 @@ def evaluate2d(model, data, M0=0, kmin=None, dk=None, Nmu=5, retmesh=False, los=
     model.mapp += M0
     data.mapp += M0
 
+    if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
+    else: modmappmean = 1.
+    if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
+    else: datmappmean = 1.
+        
     xm = FFTPower(first=FieldMesh(model.mapp/model.mapp.cmean()), 
                   second=FieldMesh(data.mapp/data.mapp.cmean()), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
     xd = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='2d', kmin=kmin, dk=dk, 
@@ -688,93 +699,93 @@ def summary2dall(report, figin=None, axin=None, c='k', ls='-', lw=1, alpha=1, la
 
 
 
-def smobj(pm, mock_model, noise_model, data, prior_ps, sml, noised = 2, smooth=None, M0=1e8, L1=False, offset=False, smoothprior=False, ftw=False, mock_models=None, offar=None, ivarar=None):
-
-    try:
-        model = mock_model.mapp
-        dlineark = mock_model.s.r2c()
-    except:
-        model = mock_model
-        if mock_models is not None: dlineark = mock_models.r2c()
-        else: 
-            print('Need initial field for prior')
-            return None
-
-    try:
-        data = data.mapp
-    except:
-        data = data
-
-    #sm
-    if smooth is not None:
-        def fingauss(pm, R):
-            kny = numpy.pi*pm.Nmesh[0]/pm.BoxSize[0]
-            def tf(k):
-                k2 = sum(((2*kny/numpy.pi)*numpy.sin(ki*numpy.pi/(2*kny)))**2  for ki in k)
-                wts = numpy.exp(-0.5*k2* R**2)
-                return wts
-            return tf            
-        tf = fingauss(pm, smooth) 
-        data = data.r2c().apply(lambda k, v: tf(k )*v).c2r()
-        model = model.r2c().apply(lambda k, v: tf(k )*v).c2r()
-
-    logdataM0 = pm.create(mode = 'real')
-    logdataM0.value[...] = numpy.log(data + M0)
-    logmodelM0 = pm.create(mode = 'real')
-    logmodelM0.value[...] = numpy.log(model + M0)
-    residual = (logmodelM0 - logdataM0)
-
-    if offset:
-        #offset array has data-model, so added to residual i.e. model-data
-        try:
-            residual += noise_model.offset
-        except:
-            residual += offar
-
-    if noised == 2:
-        if pm.comm.rank == 0:
-            print('2D noise model')
-        try:
-            residual *= noise_model.ivar2d ** 0.5
-        except:
-            residual *= ivarar
-    elif noised == 3:
-        if pm.comm.rank == 0:
-            print('3D noise model')
-        try:
-            residual *= noise_model.ivar3d ** 0.5
-        except:
-            residual *= ivarar
-
-    if ftw:
-        residual *= noise_model.ivar2d ** 0.5
-
-    #Smooth
-    smooth_window = lambda k: numpy.exp(- sml ** 2 * sum(ki ** 2 for ki in k))
-
-    residual = residual.r2c().apply(lambda k, v: smooth_window(k )*v).c2r()
-
-###################
-    #LNorm
-    if L1:
-        if pm.comm.rank == 0:
-            print('L1 norm objective is not defined\n\n')
-        return None
-    else:
-        if pm.comm.rank == 0:
-            print('L2 norm objective')
-        residual = residual.cnorm()
-
-    #Prior
-    def tfps(k):
-        k2 = sum(ki**2 for ki in k)
-        r = (prior_ps(k2 ** 0.5) / pm.BoxSize.prod()) ** -0.5
-        r[k2 == 0] = 1.0
-        return r
-    prior = dlineark.apply(lambda k, v: tfps(k )*v).c2r()
-    prior = prior.cnorm()*pm.Nmesh.prod()**-1.
-
-    return residual+prior, residual, prior
+##def smobj(pm, mock_model, noise_model, data, prior_ps, sml, noised = 2, smooth=None, M0=1e8, L1=False, offset=False, smoothprior=False, ftw=False, mock_models=None, offar=None, ivarar=None):
+##
+##    try:
+##        model = mock_model.mapp
+##        dlineark = mock_model.s.r2c()
+##    except:
+##        model = mock_model
+##        if mock_models is not None: dlineark = mock_models.r2c()
+##        else: 
+##            print('Need initial field for prior')
+##            return None
+##
+##    try:
+##        data = data.mapp
+##    except:
+##        data = data
+##
+##    #sm
+##    if smooth is not None:
+##        def fingauss(pm, R):
+##            kny = numpy.pi*pm.Nmesh[0]/pm.BoxSize[0]
+##            def tf(k):
+##                k2 = sum(((2*kny/numpy.pi)*numpy.sin(ki*numpy.pi/(2*kny)))**2  for ki in k)
+##                wts = numpy.exp(-0.5*k2* R**2)
+##                return wts
+##            return tf            
+##        tf = fingauss(pm, smooth) 
+##        data = data.r2c().apply(lambda k, v: tf(k )*v).c2r()
+##        model = model.r2c().apply(lambda k, v: tf(k )*v).c2r()
+##
+##    logdataM0 = pm.create(mode = 'real')
+##    logdataM0.value[...] = numpy.log(data + M0)
+##    logmodelM0 = pm.create(mode = 'real')
+##    logmodelM0.value[...] = numpy.log(model + M0)
+##    residual = (logmodelM0 - logdataM0)
+##
+##    if offset:
+##        #offset array has data-model, so added to residual i.e. model-data
+##        try:
+##            residual += noise_model.offset
+##        except:
+##            residual += offar
+##
+##    if noised == 2:
+##        if pm.comm.rank == 0:
+##            print('2D noise model')
+##        try:
+##            residual *= noise_model.ivar2d ** 0.5
+##        except:
+##            residual *= ivarar
+##    elif noised == 3:
+##        if pm.comm.rank == 0:
+##            print('3D noise model')
+##        try:
+##            residual *= noise_model.ivar3d ** 0.5
+##        except:
+##            residual *= ivarar
+##
+##    if ftw:
+##        residual *= noise_model.ivar2d ** 0.5
+##
+##    #Smooth
+##    smooth_window = lambda k: numpy.exp(- sml ** 2 * sum(ki ** 2 for ki in k))
+##
+##    residual = residual.r2c().apply(lambda k, v: smooth_window(k )*v).c2r()
+##
+#####################
+##    #LNorm
+##    if L1:
+##        if pm.comm.rank == 0:
+##            print('L1 norm objective is not defined\n\n')
+##        return None
+##    else:
+##        if pm.comm.rank == 0:
+##            print('L2 norm objective')
+##        residual = residual.cnorm()
+##
+##    #Prior
+##    def tfps(k):
+##        k2 = sum(ki**2 for ki in k)
+##        r = (prior_ps(k2 ** 0.5) / pm.BoxSize.prod()) ** -0.5
+##        r[k2 == 0] = 1.0
+##        return r
+##    prior = dlineark.apply(lambda k, v: tfps(k )*v).c2r()
+##    prior = prior.cnorm()*pm.Nmesh.prod()**-1.
+##
+##    return residual+prior, residual, prior
 
 
 
@@ -794,6 +805,7 @@ def smobj(pm, mock_model, noise_model, data, prior_ps, sml, noised = 2, smooth=N
 #    if mesh:
 #        bestp[key], datap[key], fitp[key] = bestm, datam, fitm
 #
+
 
 def loadfile(key, folder, ipath, reports, subf = 'best-fit', mesh=False, keycheck=True, keyskip = True, verbose=False, kmin=None, dk=None):
     if key in reports.keys() and keycheck:

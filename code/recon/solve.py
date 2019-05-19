@@ -60,6 +60,7 @@ def solve(Nmesh, x0, rtol, run, Nsm, prefix, mock_model, obj, data_p, truth_pm, 
                 print('saved')
  
  
+    if pm.comm.rank == 0: print('Starting minimization ')
     state = optimizer.minimize(prob, x0=x0, monitor=monitor)
     fit_p = mock_model.make_observable(state['x'])
     fit_p.save(optfolder + '%s/best-fit' % run)
