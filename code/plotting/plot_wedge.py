@@ -32,8 +32,8 @@ def wedge_R(zz,bfac=3.0,D=6.0):
 
 
 
-def thermal_n(kperp,zz,D=6.0,Ns=128):
-    """The thermal noise for PUMA."""
+def thermal_n(kperp,zz,D=6.0,Ns=256):
+    """The thermal noise for PUMA -- note noise rescaling from 5->5/4 yr."""
     # Some constants.
     etaA = 0.7                          # Aperture efficiency.
     Aeff = etaA*np.pi*(D/2)**2          # m^2
@@ -58,6 +58,7 @@ def thermal_n(kperp,zz,D=6.0,Ns=128):
     npol = 2
     fsky = 0.5
     tobs = 5.*365.25*24.*3600.          # sec.
+    tobs/= 4.0                          # Scale to 1/2-filled array.
     Tamp = 55.0                         # K
     Tgnd = 30.0                         # K
     Tsky = 2.7 + 25*(400./nuobs)**2.75  # K
@@ -86,7 +87,7 @@ def make_scales_plot(kmin=0.1):
     pklin = np.loadtxt("../../data/pklin_1.0000.txt")
     # Now make the figure.
     cmap   = plt.get_cmap('magma')
-    fig,ax = plt.subplots(1,4,figsize=(10,3.5),\
+    fig,ax = plt.subplots(1,4,figsize=(12,3.75),\
                           gridspec_kw={'width_ratios':[5,5,5,1]})
     for ii in range(ax.size-1):
         zz = zlist[ii]
@@ -99,21 +100,27 @@ def make_scales_plot(kmin=0.1):
         aval = np.logspace(np.log10(1/(1+zz)),0.0,100)
         Dz   = np.exp(-np.trapz(cc.Om(1/aval-1)**0.55,x=np.log(aval)))
         # Scale the linear theory P(k) and compute Kaiser.
-        pk = Dz**2 * pklin
-        xx = np.linspace(0.0,0.50,100)
-        yy = np.linspace(0.0,0.50,100)
+        pk = pklin.copy()
+        pk[:,1] *= Dz**2
+        xx = np.linspace(0.0,0.75,100)
+        yy = np.linspace(0.0,0.75,100)
         X,Y= np.meshgrid(xx,yy,indexing='ij')
         kk = np.sqrt(X**2+Y**2)
         mu = Y/(kk+1e-10)
         P  = np.interp(kk,pk[:,0],pk[:,1])
         P *= (bb+ff*mu**2)**2
         SNR= P/(P+sn+thermal_n(X,zz))
-        print(ii,np.min(SNR),np.max(SNR))
         im = ax[ii].imshow(SNR.T,origin='lower',vmin=0,vmax=1,\
                            extent=[xx[0],xx[-1],yy[0],yy[-1]],cmap=cmap)
         # Put on the wedge.
-        ax[ii].plot(xx,np.clip(wedge_R(zz,1.0)*xx,kmin,1e9),'--',color='grey')
-        ax[ii].plot(xx,np.clip(wedge_R(zz,3.0)*xx,kmin,1e9),':' ,color='grey')
+        if False:
+            ax[ii].plot(xx,np.clip(wedge_R(zz,1.0)*xx,kmin,1e9),\
+                        '--',color='grey')
+            ax[ii].plot(xx,np.clip(wedge_R(zz,3.0)*xx,kmin,1e9),\
+                        ':' ,color='grey')
+        else:
+            ax[ii].plot(xx,wedge_R(zz,1.0)*xx,'--',color='grey')
+            ax[ii].plot(xx,wedge_R(zz,3.0)*xx,':' ,color='grey')
         # Tidy up the plot.
         ax[ii].set_xlim(xx[0],xx[-1])
         ax[ii].set_ylim(yy[0],yy[-1])
@@ -123,7 +130,7 @@ def make_scales_plot(kmin=0.1):
         ax[ii].text(0.05,0.95*yy[-1],"$z={:.1f}$".format(zz),va='center',color='w')
         #
     plt.colorbar(im,cax=ax[-1])
-    ax[-1].set_aspect(20)
+    ax[-1].set_aspect(15)
     # Put on some more labels.
     ax[0].set_xlabel(r'$k_\perp\quad [h\ {\rm Mpc}^{-1}]$')
     ax[1].set_xlabel(r'$k_\perp\quad [h\ {\rm Mpc}^{-1}]$')
