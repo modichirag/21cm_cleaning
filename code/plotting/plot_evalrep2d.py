@@ -52,6 +52,7 @@ zz = 1/aa- 1
 kmin = args.kmin
 ang = args.angle
 pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
+rank = pm.comm.rank
 
 dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
 dpath += 'L%04d-N%04d/'%(bs, nc)
@@ -76,13 +77,13 @@ def make_rep_plot():
     fig, ax = plt.subplots(2, 2, figsize=(9, 9), sharex=True, sharey=True)
 
     def makeplot(bfit, datapp, lss, lww, cc, lbl=None):
-        rpfit = rp.evaluate2d(bfit, datapp, Nmu=4)[:-2]
+        rpfit = rp.evaluate2d1(bfit, datapp, Nmu=4, field='mapp')
         mus = rpfit[0]['mu'][5:].mean(axis=0)
         k = rpfit[0]['k'].mean(axis=1)
         for i in range(mus.size):
             axis = ax.flatten()[i]
             if i : lbl = None
-            rcc = rpfit[0]['power'][:, i]/(rpfit[3]['power'][:, i]*rpfit[4]['power'][:, i])**0.5
+            rcc = rpfit[0]['power'][:, i]/(rpfit[1]['power'][:, i]*rpfit[2]['power'][:, i])**0.5
             axis.plot(k, rcc, ls=lss, lw=lww, color=cc, label=lbl)
             axis.text(0.1, 0.6, r'$\mu = %.2f$'%mus[i],color='black',ha='left',va='bottom', fontdict=font)
 
@@ -183,7 +184,7 @@ def make_rep_plot():
             tick.label.set_fontproperties(fontmanage)
     ##and finish
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig(figpath + '/rep2d_L%04d_%0.4f.pdf'%(bs, aa))
+    if rank == 0: plt.savefig(figpath + '/rep2d_L%04d_%04d.pdf'%(bs, aa*10000))
 
 
 

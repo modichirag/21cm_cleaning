@@ -52,7 +52,6 @@ zz = 1/aa- 1
 kmin = args.kmin
 ang = args.angle
 pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
-rank = pm.comm.rank
 
 dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
 dpath += 'L%04d-N%04d/'%(bs, nc)
@@ -77,79 +76,80 @@ def make_rep_plot():
     fig, ax = plt.subplots(1, 2, figsize=(9, 4))
 
     def makeplot(bfit, datapp, lss, lww, cc, lbl=None):
-        rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
-        ax[0].plot(rpfit[0]['k'], rpfit[0]['power']/(rpfit[1]['power']*rpfit[2]['power'])**0.5, ls=lss, lw=lww, color=cc, label=lbl)
-        ax[1].plot(rpfit[0]['k'], (rpfit[1]['power']/rpfit[2]['power'])**0.5, ls=lss, lw=lww, color=cc)
+        rpfit = rp.evaluate(bfit, datapp)[:-2]
+        lbls = ['HI', 'Linear', 'Final']
+        for ii in [0, 1, 2]:
+            ax[0].plot(rpfit[0]['k'], rpfit[ii]['power']/(rpfit[2*ii+3]['power']*rpfit[2*ii+4]['power'])**0.5, ls=lss, lw=lww, color='C%d'%ii, label=lbls[ii])
+            ax[1].plot(rpfit[0]['k'], (rpfit[2*ii+3]['power']/rpfit[2*ii+4]['power'])**0.5, ls=lss, lw=lww, color='C%d'%ii,)
         
 
     #fits
-    try:
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier/%d-0.00/'%(nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        print(bpaths)
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = datap
-        lss, lww, cc, lbl = '-', 2, 'C0', 'Fid'
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
-            
-    try:
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier/upsample1/%d-0.00/'%(2*nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = datapup
-        lss, lww, cc, lbl = '-', 2, 'C1', 'Up1'
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
-
-    try:
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier/upsample2/%d-0.00/'%(2*nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = datapup
-        lss, lww, cc, lbl = '-', 2, 'C2', 'Up2'
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
-
-    #rsd
-    try:
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/%d-0.00/'%(nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = dataprsd
-        lss, lww, cc, lbl = '--', 2, 'C0', 'rsd'
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
-
-    try:
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/upsample1/%d-0.00/'%(2*nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = dataprsdup
-        lss, lww, cc, lbl = '--', 2, 'C1', 'rsd up'
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
-
+##    try:
+##        basepath = dpath+'ZA/opt_s999_h1massA_fourier/%d-0.00/'%(nc)
+##        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
+##        for path in bpaths:
+##            if os.path.isdir(path): break
+##        print(path)
+##        bfit = mapp.Observable.load(path)
+##        datapp = datap
+##        lss, lww, cc, lbl = '-', 2, 'C0', 'Fid'
+##        makeplot(bfit, datapp, lss, lww, cc, lbl)
+##        print('%s done'%lbl)
+##    except Exception as e: print(e)
+####            
+##    try:
+##        basepath = dpath+'ZA/opt_s999_h1massA_fourier/upsample1/%d-0.00/'%(2*nc)
+##        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
+##        for path in bpaths:
+##            if os.path.isdir(path): break
+##        print(path)
+##        bfit = mapp.Observable.load(path)
+##        datapp = datapup
+##        lss, lww, cc, lbl = '-', 2, 'C1', 'Up1'
+##        makeplot(bfit, datapp, lss, lww, cc, lbl)
+##        print('%s done'%lbl)
+##    except Exception as e: print(e)
+##
+##    try:
+##        basepath = dpath+'ZA/opt_s999_h1massA_fourier/upsample2/%d-0.00/'%(2*nc)
+##        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
+##        for path in bpaths:
+##            if os.path.isdir(path): break
+##        print(path)
+##        bfit = mapp.Observable.load(path)
+##        datapp = datapup
+##        lss, lww, cc, lbl = '-', 2, 'C2', 'Up2'
+##        makeplot(bfit, datapp, lss, lww, cc, lbl)
+##        print('%s done'%lbl)
+##    except Exception as e: print(e)
+##
+##    #rsd
+##    try:
+##        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/%d-0.00/'%(nc)
+##        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
+##        for path in bpaths:
+##            if os.path.isdir(path): break
+##        print(path)
+##        bfit = mapp.Observable.load(path)
+##        datapp = dataprsd
+##        lss, lww, cc, lbl = '--', 2, 'C0', 'rsd'
+##        makeplot(bfit, datapp, lss, lww, cc, lbl)
+##        print('%s done'%lbl)
+##    except Exception as e: print(e)
+##
+##    try:
+##        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/upsample1/%d-0.00/'%(2*nc)
+##        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
+##        for path in bpaths:
+##            if os.path.isdir(path): break
+##        print(path)
+##        bfit = mapp.Observable.load(path)
+##        datapp = dataprsdup
+##        lss, lww, cc, lbl = '--', 2, 'C1', 'rsd up'
+##        makeplot(bfit, datapp, lss, lww, cc, lbl)
+##        print('%s done'%lbl)
+##    except Exception as e: print(e)
+##
     try:
         basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/upsample2/%d-0.00/'%(2*nc)
         bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
@@ -158,14 +158,14 @@ def make_rep_plot():
         print(path)
         bfit = mapp.Observable.load(path)
         datapp = dataprsdup
-        lss, lww, cc, lbl = '--', 2, 'C2', 'rsd up2'
+        lss, lww, cc, lbl = '-', 2, 'C2', 'rsd up2'
         makeplot(bfit, datapp, lss, lww, cc, lbl)
         print('%s done'%lbl)
     except Exception as e: print(e)
 
 
     ax[0].set_ylabel('$r_{cc}$', fontdict=font)
-    ax[1].set_ylabel(r'$\sqrt{P_{\rm mod}/P_{hh}}$', fontdict=font)
+    ax[1].set_ylabel(r'$T_f$', fontdict=font)
     for axis in ax:
         axis.set_xlabel(r'$k\quad [h\,{\rm Mpc}^{-1}]$', fontdict=font)
         axis.set_xscale('log')
@@ -181,7 +181,7 @@ def make_rep_plot():
             tick.label.set_fontproperties(fontmanage)
     ##and finish
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    if rank == 0: plt.savefig(figpath + '/rep_L%04d_%04d.pdf'%(bs, aa*10000))
+    plt.savefig(figpath + '/sdmap_L%04d_%04d.pdf'%(bs, aa*10000))
 
 
 
