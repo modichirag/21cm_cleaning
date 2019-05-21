@@ -4,6 +4,7 @@ from .engine import Literal
 from .iotools import save_map, load_map
 from nbodykit.lab import FieldMesh
 
+
 class Observable(base.Observable):
     def __init__(self, mapp, d, s):
         self.mapp = mapp

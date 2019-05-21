@@ -13,12 +13,12 @@ from cosmo4d.lab import (UseComplexSpaceOptimizer,
 
 #from cosmo4d.lab import mapbias as map
 from cosmo4d import lab
-from cosmo4d.lab import report, dg, objectives
+from cosmo4d.lab import report, dg, objectives, mapnoise
 from abopt.algs.lbfgs import scalar as scalar_diag
 
 from nbodykit.cosmology import Planck15, EHPower, Cosmology
 from nbodykit.algorithms.fof import FOF
-from nbodykit.lab import KDDensity, BigFileMesh, BigFileCatalog, ArrayCatalog
+from nbodykit.lab import KDDensity, BigFileMesh, BigFileCatalog, ArrayCatalog, FieldMesh
 import sys, os, json, yaml
 from solve import solve
 from getbiasparams import getbias, eval_bfit
@@ -59,11 +59,14 @@ proj = '/project/projectdirs/cosmosim/lbl/chmodi/cosmo4d/'
 dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100-fixed/'%(nsteps, B, bs, nc)
 
 ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_ang%.1f/L%04d-N%04d/'%(aa, kmin, angle, bs, nc)
+if stage2 is not None:
+    if stage2: ofolder += 'stage2/'
+    else: ofolder += 'stage0/'
 if pmdisp: 
     ofolder += 'T%02d-B%01d/'%(nsteps, B)
 else: ofolder += 'ZA/'
 if prefix is None:
-    prefix = '_fourier_rtol'
+    prefix = '_fourier'
     if rsdpos: prefix += "_rsdpos"
 
 fname = 's999_h1massA%s'%prefix
@@ -112,10 +115,9 @@ else: dynamic_model = ZAModel(cosmo, truth_pm, B=B, steps=stages)
 if rank == 0: print(dynamic_model)
 
 #noise
-#Artifically low noise since the data is constructed from the model
-truth_noise_model = map.NoiseModel(truth_pm, None, noisevar*(truth_pm.BoxSize/truth_pm.Nmesh).prod(), 1234)
-truth_noise_model = None
-
+if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, stage2=stage2)
+else: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=None, aa=aa, stage2=stage2)
+wedge_noise_model = mapnoise.WedgeNoiseModel(pm=truth_pm, power=1, seed=100, kmin=kmin, angle=angle)
 #Create and save data if not found
 
 s_truth = BigFileMesh(dfolder + 'linear', 'LinearDensityK').paint()
@@ -123,27 +125,54 @@ dyn = BigFileCatalog(dfolder + 'fastpm_%0.4f/1'%aa)
 dlayout = truth_pm.decompose(dyn['Position'])
 d_truth = truth_pm.paint(dyn['Position'], layout=dlayout)
 
-try: 
-    params = numpy.loadtxt(optfolder + '/params.txt')
-    kerror, perror = numpy.loadtxt(optfolder + '/error_ps.txt', unpack=True)
-except Exception as e:
-    mock_model_setup = map.MockModel(dynamic_model, rsdpos=rsdpos, rsdfac=rsdfac)
-    fpos, linear, linearsq, shear = mock_model_setup.get_code().compute(['xp', 'linear', 'linearsq', 'shear'], init={'parameters': s_truth})
-    grid = truth_pm.generate_uniform_particle_grid(shift=0.0, dtype='f4')
-    params, bmod = getbias(truth_pm, hmesh, [linear, linearsq, shear], fpos, grid)
-    title = ['%0.3f'%i for i in params]
-    kerror, perror = eval_bfit(hmesh, bmod, optfolder, noise=noise, title=title, fsize=15)
-    if rank == 0: 
-        numpy.savetxt(optfolder + '/params.txt', params, header='b1, b2, bsq')
-        numpy.savetxt(optfolder + '/error_ps.txt', numpy.array([kerror, perror]).T, header='kerror, perror')
-
-ipkerror = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
-mock_model = map.MockModel(dynamic_model, params=params, rsdpos=rsdpos, rsdfac=rsdfac)
 
 try: data_p = map.Observable.load(optfolder+'/datap')
 except: 
     data_p = map.Observable(hmesh, d_truth, s_truth)
     data_p.save(optfolder+'datap/')
+
+try: 
+    data_n = map.Observable.load(optfolder+'/datan')
+except: 
+    data_n = truth_noise_model.add_noise(data_p)
+    data_n.save(optfolder+'datan/')
+
+try: data_w = map.Observable.load(optfolder+'/dataw')
+except: 
+    data_w = wedge_noise_model.add_noise(data_n)
+    data_w.save(optfolder+'dataw/')
+
+if rank == 0: print('Data setup')
+
+#Fit bias model and get noise here
+try: 
+    params = numpy.loadtxt(optfolder + '/params.txt')
+    kerror, perror = numpy.loadtxt(optfolder + '/error_ps.txt', unpack=True)
+    if stage2 is not None: 
+        kerror, perror = numpy.loadtxt(optfolder + '/error_psn.txt', unpack=True)
+        ivarmesh = BigFileMesh(optfolder + 'ivarmesh', 'ivar').paint()
+    else: ivarmesh = None
+
+except Exception as e:
+    mock_model_setup = map.MockModel(dynamic_model, rsdpos=rsdpos, rsdfac=rsdfac)
+    fpos, linear, linearsq, shear = mock_model_setup.get_code().compute(['xp', 'linear', 'linearsq', 'shear'], init={'parameters': s_truth})
+    grid = truth_pm.generate_uniform_particle_grid(shift=0.0, dtype='f4')
+    params, bmod = getbias(truth_pm, hmesh, [linear, linearsq, shear], fpos, grid)
+    if rank ==0: numpy.savetxt(optfolder + '/params.txt', params, header='b1, b2, bsq')
+    title = ['%0.3f'%i for i in params]
+    kerror, perror = eval_bfit(hmesh, bmod, optfolder, noise=noise, title=title, fsize=15)
+    if rank ==0: numpy.savetxt(optfolder + '/error_ps.txt', numpy.array([kerror, perror]).T, header='kerror, perror')
+
+    if stage2: 
+        ipkmodel = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
+        ivarmesh = truth_noise_model.get_ivarmesh(data_p, ipkmodel)
+        FieldMesh(ivarmesh).save(optfolder+'ivarmesh', dataset='ivar', mode='real')
+        kerror, perror = eval_bfit(data_n.mapp, bmod, optfolder, noise=noise, title=title, fsize=15, suff='-noise')        
+        if rank ==0: numpy.savetxt(optfolder + '/error_psn.txt', numpy.array([kerror, perror]).T, header='kerror, perror')
+    else: ivarmesh = None
+    
+ipkerror = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
+mock_model = map.MockModel(dynamic_model, params=params, rsdpos=rsdpos, rsdfac=rsdfac)
 
 try: fitp_p = map.Observable.load(optfolder+'/fitp')
 except:
@@ -181,7 +210,7 @@ for Ns in sms:
             run += '-nit_%d-sm_%.2f'%(cfg['init']['nit'], cfg['init']['sml'])
             maxiter -= int(cfg['init']['nit'])
     if maxiter > 0:
-        obj = objfunc(mock_model, truth_noise_model, data_p, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle)
+        obj = objfunc(mock_model, truth_noise_model, data_n, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle, ivarmesh=ivarmesh)
         x0 = solve(N0, x0, rtol, run, Ns, prefix, mock_model, obj, data_p, truth_pm, optfolder, \
                saveit=20, showit=5, title=None, maxiter=maxiter)    
 

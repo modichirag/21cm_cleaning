@@ -33,16 +33,17 @@ def evaluate(model, data, M0=0, stoch=False, kmin=None, dk=None):
     #else: datmappmean = 1.
         
     xm = FFTPower(first=FieldMesh(model.mapp/modmappmean), second=FieldMesh(data.mapp/datmappmean), mode='1d', kmin=kmin, dk=dk)
-    xd = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
-    xs = FFTPower(first=FieldMesh(model.s), second=FieldMesh(data.s), mode='1d', kmin=kmin, dk=dk)
-
     pm1 = FFTPower(first=FieldMesh(model.mapp/modmappmean), mode='1d', kmin=kmin, dk=dk)
-    pd1 = FFTPower(first=FieldMesh(model.d), mode='1d', kmin=kmin, dk=dk)
-    ps1 = FFTPower(first=FieldMesh(model.s), mode='1d', kmin=kmin, dk=dk)
-
     pm2 = FFTPower(first=FieldMesh(data.mapp/datmappmean), mode='1d', kmin=kmin, dk=dk)
-    pd2 = FFTPower(first=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
+
+    xs = FFTPower(first=FieldMesh(model.s), second=FieldMesh(data.s), mode='1d', kmin=kmin, dk=dk)
+    ps1 = FFTPower(first=FieldMesh(model.s), mode='1d', kmin=kmin, dk=dk)
     ps2 = FFTPower(first=FieldMesh(data.s), mode='1d', kmin=kmin, dk=dk)
+
+    xd = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
+    pd1 = FFTPower(first=FieldMesh(model.d), mode='1d', kmin=kmin, dk=dk)
+    pd2 = FFTPower(first=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
+
 
     if stoch:
         psd = FFTPower(first=FieldMesh(data.s), second=FieldMesh(model.s), mode='1d', kmin=kmin, dk=dk)
@@ -71,30 +72,89 @@ def evaluate(model, data, M0=0, stoch=False, kmin=None, dk=None):
 
 
 
-def evaluate1(model, data, norm=True, kmin=None, dk=None):
+def evaluate1(model, data, field, M0=0, stoch=False, kmin=None, dk=None):
     '''return position order:
-    px,p1,p2
+    xm.power, xs.power, xd.power, 
+    pm1.power, pm2.power, 
+    ps1.power, ps2.power, 
+    pd1.power, pd2.power, 
+    data_preview, model_preview
     '''
     from nbodykit.lab import FieldMesh, FFTPower, ProjectedFFTPower
 
     if kmin is None: kmin = 0 
-    if dk is None: dk = 2*numpy.pi/model.BoxSize[0]
+    if dk is None: dk = 2*numpy.pi/model.s.BoxSize[0]
 
-    if norm:
-        mod = model/model.cmean()
-        dat = data/data.cmean()
+    model.mapp += M0
+    data.mapp += M0
+
+
+    #print('Means are : ', model.mapp.cmean(), data.mapp.cmean())
+    if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
+    else: modmappmean = 1.
+    if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
+    else: datmappmean = 1.
+    modmappmean, datmappmean = 1., 1.
+    #if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
+    #else: modmappmean = 1.
+    #if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
+    #else: datmappmean = 1.
+        
+    data_preview, model_preview = [], []
+    if field == 'mapp':
+        x = FFTPower(first=FieldMesh(model.mapp/modmappmean), second=FieldMesh(data.mapp/datmappmean), mode='1d', kmin=kmin, dk=dk)
+        p1 = FFTPower(first=FieldMesh(model.mapp/modmappmean), mode='1d', kmin=kmin, dk=dk)
+        p2 = FFTPower(first=FieldMesh(data.mapp/datmappmean), mode='1d', kmin=kmin, dk=dk)
+        for axes in [[1, 2], [0, 2], [0, 1]]:
+            data_preview.append(data.mapp.preview(axes=axes))
+            model_preview.append(model.mapp.preview(axes=axes))
+
+    elif field == 's':
+        x = FFTPower(first=FieldMesh(model.s), second=FieldMesh(data.s), mode='1d', kmin=kmin, dk=dk)
+        p1 = FFTPower(first=FieldMesh(model.s), mode='1d', kmin=kmin, dk=dk)
+        p2 = FFTPower(first=FieldMesh(data.s), mode='1d', kmin=kmin, dk=dk)
+        for axes in [[1, 2], [0, 2], [0, 1]]:
+            data_preview.append(data.s.preview(axes=axes))
+            model_preview.append(model.s.preview(axes=axes))
+
+    elif field == 'd':
+        x = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
+        p1 = FFTPower(first=FieldMesh(model.d), mode='1d', kmin=kmin, dk=dk)
+        p2 = FFTPower(first=FieldMesh(data.d), mode='1d', kmin=kmin, dk=dk)
+        for axes in [[1, 2], [0, 2], [0, 1]]:
+            data_preview.append(data.d.preview(axes=axes))
+            model_preview.append(model.d.preview(axes=axes))
     else:
-        mod, dat = model, data
+        print('Field not recongnized')
+        return 0
+        
+    return x.power, p1.power, p2.power, data_preview, model_preview
 
-    px = FFTPower(first=FieldMesh(mod), second=FieldMesh(dat), mode='1d', kmin=kmin, dk=dk)
-
-    p1 = FFTPower(first=FieldMesh(mod), mode='1d', kmin=kmin, dk=dk)
-
-    p2 = FFTPower(first=FieldMesh(dat), mode='1d', kmin=kmin, dk=dk)
-
-
-    return px.power, p1.power, p2.power
-
+#
+#def evaluate1(model, data, norm=True, kmin=None, dk=None):
+#    '''return position order:
+#    px,p1,p2
+#    '''
+#    from nbodykit.lab import FieldMesh, FFTPower, ProjectedFFTPower
+#
+#    if kmin is None: kmin = 0 
+#    if dk is None: dk = 2*numpy.pi/model.BoxSize[0]
+#
+#    if norm:
+#        mod = model/model.cmean()
+#        dat = data/data.cmean()
+#    else:
+#        mod, dat = model, data
+#
+#    px = FFTPower(first=FieldMesh(mod), second=FieldMesh(dat), mode='1d', kmin=kmin, dk=dk)
+#
+#    p1 = FFTPower(first=FieldMesh(mod), mode='1d', kmin=kmin, dk=dk)
+#
+#    p2 = FFTPower(first=FieldMesh(dat), mode='1d', kmin=kmin, dk=dk)
+#
+#
+#    return px.power, p1.power, p2.power
+#
 
 
 
@@ -452,6 +512,51 @@ def evaluate2d(model, data, M0=0, kmin=None, dk=None, Nmu=5, retmesh=False, los=
 
     
     
+
+def evaluate2d1(model, data, field, M0=0, kmin=None, dk=None, Nmu=5, retmesh=False, los=[0, 0, 1]):
+    '''return position order:
+    xm.power, xs.power, xd.power, 
+    pm1.power, pm2.power, 
+    ps1.power, ps2.power, 
+    pd1.power, pd2.power, 
+    data_preview, model_preview
+    '''
+    from nbodykit.lab import FieldMesh, FFTPower, ProjectedFFTPower
+
+    if kmin is None: kmin = 0 
+    if dk is None: dk = 2*numpy.pi/model.s.BoxSize[0]
+
+    model.mapp += M0
+    data.mapp += M0
+
+    if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
+    else: modmappmean = 1.
+    if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
+    else: datmappmean = 1.
+    modmappmean, datmappmean = 1., 1.
+        
+    if field == 'mapp':
+        x = FFTPower(first=FieldMesh(model.mapp/modmappmean), 
+                  second=FieldMesh(data.mapp/datmappmean), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+        p1 = FFTPower(first=FieldMesh(model.mapp/modmappmean), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+        p2 = FFTPower(first=FieldMesh(data.mapp/datmappmean), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+
+    elif field == 's':
+        x = FFTPower(first=FieldMesh(model.s), second=FieldMesh(data.s), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+        p1 = FFTPower(first=FieldMesh(model.s), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+        p2 = FFTPower(first=FieldMesh(data.s), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+
+    elif field == 'd':
+        x = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+        p1 = FFTPower(first=FieldMesh(model.d), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+        p2 = FFTPower(first=FieldMesh(data.d), mode='2d', kmin=kmin, dk=dk, Nmu=Nmu, los=[0, 0, 1])
+    else:
+        print('Field not recongnized')
+        return 0
+
+    return x.power, p1.power, p2.power
+
+
 def summary2dmu(report, figin=None, axin=None, c='k', ls='-', lw=1, alpha=1, label=None, grid=True, filename=None, minor=True,
                 lfsize=10, ylsize=14, titsize=14, lncol=2, titles=['Initial', 'Final', 'Model'], muplot=[0], mulab=False, 
                 lsmu=['-', '--', ':', '-.'], lsmustyle=True, tfdensity=True):

@@ -6,7 +6,7 @@ from cosmo4d import base
 
 from cosmo4d import objectives
 from cosmo4d import objectives_dev
-
+from cosmo4d import mapnoise
 
 from cosmo4d import map3d
 from cosmo4d import mapfinal

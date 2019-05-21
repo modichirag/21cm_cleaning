@@ -125,12 +125,14 @@ class SmoothedFourierWedgeObjective(Objective):
         only fit the large scale. Since we know usually the large scale converges
         very slowly this helps to stablize the solution.
     """
-    def __init__(self, mock_model, noise_model, data, prior_ps, error_ps, sml, kmin, angle):
+    def __init__(self, mock_model, noise_model, data, prior_ps, error_ps, sml, kmin, angle, ivarmesh=None):
         Objective.__init__(self, mock_model, noise_model, data, prior_ps)
         self.sml = sml
         self.error_ps = error_ps
         self.kmin = kmin
         self.angle = angle
+        self.ivarmesh = ivarmesh
+        if ivarmesh is not None: self.ivarmeshc = self.ivarmesh.r2c()
 
     def get_code(self):
         import numpy
@@ -139,12 +141,15 @@ class SmoothedFourierWedgeObjective(Objective):
         data = self.data.mapp
 
         code.add(x1='model', x2=Literal(data * -1), y='residual')
-        if self.noise_model is not None: 
-            code.multiply(x1='residual', x2=Literal(self.noise_model.ivar2d ** 0.5), y='residual')
         code.r2c(real='residual', complex='C')
         smooth_window = lambda k: numpy.exp(- self.sml ** 2 * sum(ki ** 2 for ki in k))
         code.transfer(complex='C', tf=smooth_window)
-        code.create_whitenoise(dlinear_k='C', powerspectrum=self.error_ps, whitenoise='perror')
+        #code.create_whitenoise(dlinear_k='C', powerspectrum=self.error_ps, whitenoise='perror')
+        if self.ivarmesh is None: code.create_whitenoise(dlinear_k='C', powerspectrum=self.error_ps, whitenoise='perror')
+        else: 
+            if pm.comm.rank == 0: print('Using ivarmesh')
+            code.multiply(x1='C', x2=Literal(self.ivarmeshc**0.5), y='perrorc')
+            code.c2r(complex='perrorc', real='perror')
 
         def tf(k):
             kmesh = sum(ki ** 2 for ki in k)**0.5
@@ -174,3 +179,6 @@ class SmoothedFourierWedgeObjective(Objective):
         code.multiply(x1='prior', x2=Literal(pm.Nmesh.prod()**-1.), y='prior')
         code.add(x1='prior', x2='chi2', y='objective')
         return code
+
+
+
