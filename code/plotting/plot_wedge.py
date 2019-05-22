@@ -32,7 +32,7 @@ def wedge_R(zz,bfac=3.0,D=6.0):
 
 
 
-def thermal_n(kperp,zz,D=6.0,Ns=256):
+def thermal_n(kperp,zz,D=6.0,Ns=256,hex=True):
     """The thermal noise for PUMA -- note noise rescaling from 5->5/4 yr."""
     # Some constants.
     etaA = 0.7                          # Aperture efficiency.
@@ -48,12 +48,20 @@ def thermal_n(kperp,zz,D=6.0,Ns=256):
     # Eq. (3.3) of Chen++19
     d2V  = chi**2*2997.925/Ez*(1+zz)**2
     # Eq. (3.5) of Chen++19
-    n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
-    uu   = kperp*chi/(2*np.pi)
-    xx   = uu*lam21/Ns/D                # Dimensionless.
-    nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
-    nbase[uu<   D/lam21    ]=1e-30
-    nbase[uu>Ns*D/lam21*1.4]=1e-30
+    if hex:    # Hexagonal array of Ns^2 elements.
+        n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.5698,-0.5274,0.8358,1.6635,7.3177
+        uu   = kperp*chi/(2*np.pi)
+        xx   = uu*lam21/Ns/D                # Dimensionless.
+        nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
+        nbase[uu<   D/lam21    ]=1e-30
+        nbase[uu>Ns*D/lam21*1.3]=1e-30
+    else:      # Square array of Ns^2 elements.
+        n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
+        uu   = kperp*chi/(2*np.pi)
+        xx   = uu*lam21/Ns/D                # Dimensionless.
+        nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
+        nbase[uu<   D/lam21    ]=1e-30
+        nbase[uu>Ns*D/lam21*1.4]=1e-30
     # Eq. (3.2) of Chen++19
     npol = 2
     fsky = 0.5
