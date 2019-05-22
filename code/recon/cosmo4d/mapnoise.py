@@ -11,6 +11,8 @@ from cosmo4d.pmeshengine import nyquist_mask
 from cosmo4d.iotools import save_map, load_map
 from cosmo4d.mapbias import Observable
 #
+from   astropy.cosmology import FlatLambdaCDM
+
 
 package_path = os.path.dirname(os.path.abspath(__file__))+'/'
 klin, plin = numpy.loadtxt(package_path + '../../../data/pklin_1.0000.txt', unpack = True)
@@ -18,6 +20,7 @@ ipk = interpolate(klin, plin)
 #cosmo = Planck15.clone(Omega_cdm = 0.2685, h = 0.6711, Omega_b = 0.049)
 cosmodef = {'omegam':0.309167, 'h':0.677, 'omegab':0.048}
 cosmo = Cosmology.from_dict(cosmodef)
+cc = FlatLambdaCDM(H0=67.7,Om0=0.309167)
 
 
 def volz(z, dz=0.1, sky=20000):
@@ -48,16 +51,17 @@ def visibility(stage2=True):
     Ls = Ds* Ns
     def vis(k, mu, z):
         chiz = lambda z : cosmo.comoving_distance(z)
-        u =  k *numpy.sqrt(1 - mu**2)* chiz(z) /(2* numpy.pi)#* wavez(z)**2
-        D = u
+        u =  k *numpy.sqrt(1 - mu**2)* chiz(z) /(2* numpy.pi)
+        D = u *0.21*(1+z)
         DLs = D/Ls
         #n =  n0 *(0.4847 - 0.33 *(D/Ls))/(1 + 1.3157 *(D/Ls)**1.5974) * numpy.exp(-(D/Ls)**6.8390)
-        n =  n0 *(0.4847 - 0.33 *(DLs))/(1 + 1.3157 *(DLs)**1.5974) * numpy.exp(-(DLs)**6.8390)
+        n =  n0 *(0.4847 - 0.33 *(DLs))/(1 + 1.3157 *(DLs)**1.5974) * numpy.exp(-(DLs)**6.8390) *(0.21*(1+z))**2
         return n
     return vis
 
 
-def thermalnoise(z, stage2=True, mK=False):
+def thermalnoise(z, stage2=True, mK=False, retn=False):
+    eta =0.7
     fsky21 = 20000/41252;
     Ns = 256
     if not stage2: Ns = 32
@@ -67,17 +71,21 @@ def thermalnoise(z, stage2=True, mK=False):
     npol = 2
     S21 = 4 *numpy.pi* fsky21
     t0 = 5*365*24*60*60
-    Aeff = numpy.pi* (Ds/2)**2 *0.7 #effective
+    Aeff = numpy.pi* (Ds/2)**2 *eta #effective
     nu0 = 1420*1e6
     wavez = lambda z: 0.211 *(1 + z)
     chiz = lambda z : cosmo.comoving_distance(z)
     #defintions
-    n = lambda D: n0 *(0.4847 - 0.33 *(D/Ls))/(1 + 1.3157 *(D/Ls)**1.5974) * numpy.exp(-(D/Ls)**6.8390) +1e-7
     Tb = lambda z: 180/(cosmo.efunc(z)) *(4 *10**-4 *(1 + z)**0.6) *(1 + z)**2*cosmodef['h']
-    FOV= lambda z: (1.22* wavez(z)/Ds)**2; #why is Ds here
+    #FOV= lambda z: (1.22* wavez(z)/Ds)**2/eta; #why is Ds here
+    FOV= lambda z: ( wavez(z)/Ds)**2/eta; #why is Ds here
     Ts = lambda z: (55 + 30 + 2.7 + 25 *(1420/400/(1 + z))**-2.75) * 1000;
-    u = lambda k, mu, z: k *numpy.sqrt(1 - mu**2)* chiz(z) /(2* numpy.pi)#* wavez(z)**2
-    #terms
+
+    #u = lambda k, mu, z: k *numpy.sqrt(1 - mu**2)* chiz(z) /(2* numpy.pi)#* wavez(z)**2
+    #n = lambda D: n0 *(0.4847 - 0.33 *(D/Ls))/(1 + 1.3157 *(D/Ls)**1.5974) * numpy.exp(-(D/Ls)**6.8390) +1e-7
+    u = lambda k, mu, z: k *numpy.sqrt(1 - mu**2)* chiz(z) /(2* numpy.pi)* wavez(z)**2
+    n = lambda D: n0 *(0.4847 - 0.33 *(D/Ls))/(1 + 1.3157 *(D/Ls)**1.5974) * numpy.exp(-(D/Ls)**6.8390)* wavez(z)**2 +1e-7
+   #terms
     d2V = lambda z: chiz(z)**2* 3* 10**5 *(1 + z)**2 /cosmo.efunc(z)/100 
     fac = lambda z: Ts(z)**2 * S21 / Aeff **2 * (wavez(z))**4 /FOV(z) 
     # fac = lambda z: Ts(z)**2 * S21 /Aeff **2 * ((1.22 * wavez(z))**2)**2 #/FOV(z)/1.22**4
@@ -85,10 +93,58 @@ def thermalnoise(z, stage2=True, mK=False):
     #
     setupz = cfac *fac(z) *d2V(z) / wavez(z)**2
     if  not mK: setupz /= Tb(z)**2
-    #if mK:  Pn = lambda k, mu, z: cfac *fac(z) *d2V(z) / (n(u(k, mu, z)) * wavez(z)**2)
-    #else: Pn =  lambda k, mu, z: cfac *fac(z) *d2V(z) / (n(u(k, mu, z)) * wavez(z)**2) / Tb(z)**2
-    Pn = lambda k, mu, z: setupz / n(u(k, mu, z))
+    print('d2V =', d2V(z))
+    print('Omp =', FOV(z))
+    #Pn = lambda k, mu, z: setupz / n(u(k, mu, z))
+    #if retn: return lambda k, mu, z: n(u(k, mu, z))
+    Pn = lambda k, mu: setupz / visibility()(k, mu, z)
+    if retn: return lambda k, mu: visibility()(k, mu, z)
     return Pn
+
+
+
+
+def thermal_n(k, mu, zz,D=6.0,Ns=256,att='reas'):
+    """The thermal noise for PUMA -- note noise rescaling."""
+    # Some constants.
+    etaA = 0.7                          # Aperture efficiency.
+    Aeff = etaA*numpy.pi*(D/2)**2          # m^2
+    lam21= 0.21*(1+zz)                  # m
+    nuobs= 1420/(1+zz)                  # MHz
+    # The cosmology-dependent factors.
+    hub  = cc.H(0).value / 100.0
+    Ez   = cc.H(zz).value / cc.H(0).value
+    chi  = cc.comoving_distance(zz).value * hub         # Mpc/h.
+    OmHI = 4e-4*(1+zz)**0.6 / Ez**2
+    Tbar = 0.188*hub*(1+zz)**2*Ez*OmHI  # K
+    # Eq. (3.3) of Chen++19
+    d2V  = chi**2*2997.925/Ez*(1+zz)**2
+    # Eq. (3.5) of Chen++19
+    n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
+    kperp = k*numpy.sqrt(1-mu**2)
+    uu   = kperp*chi/(2*numpy.pi)
+    xx   = uu*lam21/Ns/D                # Dimensionless.
+    nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*numpy.exp(-xx**c5) * lam21**2 + 1e-30
+    #nbase[uu<   D/lam21    ]=1e-30
+    #nbase[uu>Ns*D/lam21*1.4]=1e-30
+    # Eq. (3.2) of Chen++19
+    npol = 2
+    fsky = 0.5
+    tobs = 5.*365.25*24.*3600.          # sec.
+    if att == 'opt': tobs/= 1.0         # Scale to 1/2-filled array.
+    elif att == 'reas': tobs/= 4.0      # Scale to 1/2-filled array
+    elif att == 'pess': tobs/= 16.0       # Scale to 1/2-filled array.
+    Tamp = 55.0                         # K
+    Tgnd = 30.0                         # K
+    Tsky = 2.7 + 25*(400./nuobs)**2.75  # K
+    Tsys = Tamp + Tsky + Tgnd
+    Omp  = (lam21/D)**2/etaA
+    # Return Pth in "cosmological units", with the Tbar divided out.
+    Pth  = (Tsys/Tbar)**2*(lam21**2/Aeff)**2 *\
+           4*numpy.pi*fsky/Omp/(npol*1420e6*tobs*nbase) * d2V
+    return(Pth)
+    #
+
 
 
 class NoiseModel(base.NoiseModel):
@@ -125,29 +181,33 @@ class NoiseModel(base.NoiseModel):
 
 
 class ThermalNoise(base.NoiseModel):
-    def __init__(self, pm, aa, seed=100, stage2=True):
+    def __init__(self, pm, aa, seed=100, stage2='reas'):
         self.pm = pm
         self.aa = aa
         self.zz = 1/aa-1
         self.seed = seed
-        self.noise = thermalnoise(self.zz, stage2=stage2)
-        #self.var= power / (self.pm.BoxSize / self.pm.Nmesh).prod()
-        #self.ivar2d = mask2d * self.var ** -1
-
+        self.noise = lambda k, mu: thermal_n(k, mu, self.zz, att=stage2)
+        #self.noise = lambda kp: thermal_n(kp, self.zz, att=stage2)
+        #self.noise = thermalnoise(self.zz, stage2=True)
+        
 
     def get_ivarmesh(self, obs, ipk=None):
         pm = obs.mapp.pm
         kk = obs.mapp.r2c().x
         kmesh = sum(i**2 for i in kk)**0.5
+        mask = kmesh == 0
         kmesh[kmesh == 0] = 1
         mumesh = kk[2]/kmesh
+        #mumesh[mask] = 0
         kperp = (kk[0]**2 + kk[1]**2)**0.5
         
-        #print('eval noise ps', kperp.shape, mumesh.shape)
-        noiseth = self.noise(kperp, mumesh, self.zz)
+        noiseth = self.noise(kmesh, mumesh)
+        #noiseth = self.noise(kperp)
+        noiseth = noiseth + kmesh*0
         if ipk is not None: noise = ipk(kmesh)
         else: noise = noiseth * 0
         toret = ((noiseth + noise)/ pm.BoxSize.prod()) ** -1.
+        #toret = toret*0+1
         return pm.create(mode='complex', value=toret).c2r()
         
     def add_noise(self, obs):
@@ -158,11 +218,14 @@ class ThermalNoise(base.NoiseModel):
         kmesh[kmesh == 0] = 1
         mumesh = kk[2]/kmesh
         kperp = (kk[0]**2 + kk[1]**2)**0.5
+        mask = kmesh == 0
+        mumesh = kk[2]/kmesh
+        #mumesh[mask] = 0
         
-        #print('eval noise ps', kperp.shape, mumesh.shape)
-        noisep = self.noise(kperp, mumesh, self.zz)
-        #print(numpy.isnan(noisep).sum())
-
+        noisep = self.noise(kmesh, mumesh)
+        #noisep = self.noise(kperp)
+        #noisep = noisep + kmesh*0
+        #noise = noisep*0 + 1
         if self.seed is None:
             n = pm.create(mode='real')
             n[...] = 0
@@ -170,6 +233,7 @@ class ThermalNoise(base.NoiseModel):
             n = pm.generate_whitenoise(mode='complex', seed=self.seed)
             n = (n * (noisep / pm.BoxSize.prod()) ** 0.5 ).c2r(out=Ellipsis)
             #if pm.comm.rank == 0: print('Noise Variance check', (n ** 2).csum() / n.Nmesh.prod(), self.var)
+
         return Observable(mapp=obs.mapp + n, s=obs.s, d=obs.d)
 
 

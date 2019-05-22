@@ -167,7 +167,7 @@ def eval_bfit(hmesh, mod, ofolder, noise=None, title=None, fsize=15, suff=None):
 
     plt.close()
 
-    return k, perr.real
+    return k[1:], perr.real[1:]
 
 
 

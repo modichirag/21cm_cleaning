@@ -40,12 +40,18 @@ cosmo = Cosmology.from_dict(cosmodef)
 cfname = sys.argv[1]
 with open(cfname, 'r') as ymlfile: cfg = yaml.load(ymlfile)
 for i in cfg['basep'].keys(): locals()[i] = cfg['basep'][i]
-kmin, angle = cfg['mods']['kmin'], cfg['mods']['angle']
-h1model = HImodels.ModelA(aa)
+zz = 1/aa-1
 
 truth_pm = ParticleMesh(BoxSize=bs, Nmesh=(nc, nc, nc), dtype='f4')
 comm = truth_pm.comm
 rank = comm.rank
+kmin, angle = cfg['mods']['kmin'], cfg['mods']['angle']
+h1model = HImodels.ModelA(aa)
+if angle is None:
+    angle = numpy.round(mapnoise.wedge(zz, att=cfg['mods']['wopt'], angle=True), 0)
+if rank == 0: 
+    print(angle)
+    print(type(angle))
 
 if numd <= 0: num = -1
 else: num = int(bs**3 * numd)
@@ -60,8 +66,8 @@ dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100-fi
 
 ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_ang%.1f/L%04d-N%04d/'%(aa, kmin, angle, bs, nc)
 if stage2 is not None:
-    if stage2: ofolder += 'stage2/'
-    else: ofolder += 'stage0/'
+    if stage2: ofolder += 'thermal-%s/'%stage2
+    #else: ofolder += 'stage0/'
 if pmdisp: 
     ofolder += 'T%02d-B%01d/'%(nsteps, B)
 else: ofolder += 'ZA/'
@@ -136,6 +142,8 @@ try:
 except: 
     data_n = truth_noise_model.add_noise(data_p)
     data_n.save(optfolder+'datan/')
+data_n = truth_noise_model.add_noise(data_p)
+data_n.save(optfolder+'datan/')
 
 try: data_w = map.Observable.load(optfolder+'/dataw')
 except: 
