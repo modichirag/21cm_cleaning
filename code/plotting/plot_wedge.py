@@ -95,7 +95,7 @@ def make_scales_plot(kmin=0.1):
     pklin = np.loadtxt("../../data/pklin_1.0000.txt")
     # Now make the figure.
     cmap   = plt.get_cmap('magma')
-    fig,ax = plt.subplots(1,4,figsize=(12,3.75),\
+    fig,ax = plt.subplots(1,4,figsize=(9,3.),\
                           gridspec_kw={'width_ratios':[5,5,5,1]})
     for ii in range(ax.size-1):
         zz = zlist[ii]
@@ -110,8 +110,8 @@ def make_scales_plot(kmin=0.1):
         # Scale the linear theory P(k) and compute Kaiser.
         pk = pklin.copy()
         pk[:,1] *= Dz**2
-        xx = np.linspace(0.0,0.75,100)
-        yy = np.linspace(0.0,0.75,100)
+        xx = np.linspace(0.0,0.8,100)
+        yy = np.linspace(0.0,0.8,100)
         X,Y= np.meshgrid(xx,yy,indexing='ij')
         kk = np.sqrt(X**2+Y**2)
         mu = Y/(kk+1e-10)
