@@ -62,13 +62,19 @@ def thermal_n(kperp,zz,D=6.0,Ns=256,hex=True):
         nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
         nbase[uu<   D/lam21    ]=1e-30
         nbase[uu>Ns*D/lam21*1.4]=1e-30
-    # Eq. (3.2) of Chen++19
+    # Eq. (3.2) of Chen++19, updated to match PUMA specs:
     npol = 2
     fsky = 0.5
     tobs = 5.*365.25*24.*3600.          # sec.
     tobs/= 4.0                          # Scale to 1/2-filled array.
-    Tamp = 55.0                         # K
-    Tgnd = 30.0                         # K
+    # the signal entering OMT is given by eta_dish*T_s + (1-eta_dish)*T_g
+    # and after hitting both with eta_omt and adding amplifier noise you get:
+    # T_ampl + eta_omt.eta_dish.T_s + eta_omt(1-eta_dish)T_g
+    # so normalizing to have 1 in front of Ts we get
+    # T_ampl/(eta_omt*eta_dish) + T_g (1-eta_dish)/(eta_dish) + T_sky
+    # Putting in T_ampl=50K T_g=30K eta_omt=eta_dish=0.9 gives:
+    Tamp = 50.0/0.9**2                  # K
+    Tgnd = 30.0/0.9                     # K
     Tsky = 2.7 + 25*(400./nuobs)**2.75  # K
     Tsys = Tamp + Tsky + Tgnd
     Omp  = (lam21/D)**2/etaA
