@@ -74,7 +74,7 @@ def thermal_n(kperp,zz,D=6.0,Ns=256,hex=True):
     # T_ampl/(eta_omt*eta_dish) + T_g (1-eta_dish)/(eta_dish) + T_sky
     # Putting in T_ampl=50K T_g=30K eta_omt=eta_dish=0.9 gives:
     Tamp = 50.0/0.9**2                  # K
-    Tgnd = 30.0/0.9                     # K
+    Tgnd = 30.0/0.9*(1-0.9)             # K
     Tsky = 2.7 + 25*(400./nuobs)**2.75  # K
     Tsys = Tamp + Tsky + Tgnd
     Omp  = (lam21/D)**2/etaA
