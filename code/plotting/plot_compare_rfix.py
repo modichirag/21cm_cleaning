@@ -47,21 +47,27 @@ args = parser.parse_args()
 
 figpath = './figs/'
 
-bs, nc, aa = args.bs, args.nmesh, args.aa
+#bs, nc, aa = args.bs, args.nmesh, args.aa
+
+kmin = 0.03
+ang = 15.
+
+bs, nc = 1024, 256
+aa = 0.2000
 zz = 1/aa- 1
-kmin = args.kmin
-ang = args.angle
 pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
 rank = pm.comm.rank
 
-#dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
-#dpath += 'L%04d-N%04d/'%(bs, nc)
 
 ################
 def make_rep_plot():
     """Does the work of making the real-space xi(r) and b(r) figure."""
     
 
+    noises = np.loadtxt('/global/u1/c/chmodi/Programs/21cm/21cm_cleaning/data/summaryHI.txt').T
+    for i in range(noises[0].size):
+        if noises[0][i] == np.round(1/aa-1, 2): noise = noises[3][i]
+    print(noise)
 
 
     fig, ax = plt.subplots(1, 2, figsize=(9, 4))
@@ -72,74 +78,38 @@ def make_rep_plot():
         ax[1].plot(rpfit[0]['k'], (rpfit[1]['power']/rpfit[2]['power'])**0.5, ls=lss, lw=lww, color=cc)
         
 
-    #fits
+    
     try:        
-        aa = 0.1429
         dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
-        dpath += 'L%04d-N%04d//'%(bs, nc)
-        dataprsd = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap')
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/%d-0.00/'%(nc)
+        dpath += 'L%04d-N%04d/thermal-reas/ZA/opt_s999_h1massA_fourier_rsdpos/'%(bs, nc)
+        datapp = mapp.Observable.load(dpath+'/datap')
+        basepath = dpath+'/%d-0.00/'%(nc)
         bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
         for path in bpaths:
             if os.path.isdir(path): break
         print(path)
         bfit = mapp.Observable.load(path)
-        datapp = dataprsd
-        lss, lww, cc, lbl = '-', 2, 'C0', 'rsd z=%.2f'%(1/aa-1)
+        lss, lww, cc, lbl = '-', 2, 'C0', 'Fixed'
         makeplot(bfit, datapp, lss, lww, cc, lbl)
         print('%s done'%lbl)
     except Exception as e: print(e)
             
     try:        
-        aa = 0.3333
         dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
-        dpath += 'L%04d-N%04d//'%(bs, nc)
-        dataprsd = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap')
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/%d-0.00/'%(nc)
+        dpath += 'L%04d-N%04d-R/thermal-reas/ZA/opt_s999_h1massA_fourier_rsdpos'%(bs, nc)
+        datapp = mapp.Observable.load(dpath+'/datap')
+        basepath = dpath+'/%d-0.00/'%(nc)
         bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
         for path in bpaths:
             if os.path.isdir(path): break
         print(path)
         bfit = mapp.Observable.load(path)
-        datapp = dataprsd
-        lss, lww, cc, lbl = '-', 2, 'C1', 'rsd z=%.2f'%(1/aa-1)
+        lss, lww, cc, lbl = '-', 2, 'C1', 'Rayleigh'
         makeplot(bfit, datapp, lss, lww, cc, lbl)
         print('%s done'%lbl)
     except Exception as e: print(e)
 
-    try:        
-        aa = 0.1429
-        dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
-        dpath += 'L%04d-N%04d/stage2/'%(bs, nc)
-        dataprsd = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap')
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/%d-0.00/'%(nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = dataprsd
-        lss, lww, cc, lbl = '--', 2, 'C0', 'Thermal, rsd z=%.2f'%(1/aa-1)
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
-            
-    try:        
-        aa = 0.3333
-        dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)
-        dpath += 'L%04d-N%04d/stage2/'%(bs, nc)
-        dataprsd = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/datap')
-        basepath = dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/%d-0.00/'%(nc)
-        bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
-        for path in bpaths:
-            if os.path.isdir(path): break
-        print(path)
-        bfit = mapp.Observable.load(path)
-        datapp = dataprsd
-        lss, lww, cc, lbl = '--', 2, 'C1', 'Thermal, rsd z=%.2f'%(1/aa-1)
-        makeplot(bfit, datapp, lss, lww, cc, lbl)
-        print('%s done'%lbl)
-    except Exception as e: print(e)
+
 
 
     ax[0].set_ylabel('$r_{cc}$', fontdict=font)
@@ -159,7 +129,7 @@ def make_rep_plot():
             tick.label.set_fontproperties(fontmanage)
     ##and finish
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    if rank  == 0: plt.savefig(figpath + '/zcompare_L%04d.pdf'%(bs))
+    if rank  == 0: plt.savefig(figpath + '/fixed-ray_L%04d_%04d.pdf'%(bs, aa*10000))
 
 
 

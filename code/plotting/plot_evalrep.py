@@ -169,7 +169,7 @@ def make_rep_plot():
     for axis in ax:
         axis.set_xlabel(r'$k\quad [h\,{\rm Mpc}^{-1}]$', fontdict=font)
         axis.set_xscale('log')
-        axis.grid(which='both')
+        axis.grid(which='both', lw=0.2, alpha=0.2, color='gray')
         axis.legend(prop=fontmanage)
 
     # Put on some more labels.
