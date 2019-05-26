@@ -1,5 +1,6 @@
 
 import numpy
+import numpy as np
 import re, json, warnings, os
 from scipy.interpolate import InterpolatedUnivariateSpline as interpolate
 from nbodykit.lab import FieldMesh
@@ -103,12 +104,12 @@ def thermalnoise(z, stage2=True, mK=False, retn=False):
 
 
 
-
-def thermal_n(k, mu, zz,D=6.0,Ns=256,att='reas'):
-    """The thermal noise for PUMA -- note noise rescaling."""
+def thermal_n(k, mu,zz,D=6.0,Ns=256,att='reas', spread=1, hex=True):
+    """The thermal noise for PUMA -- note noise rescaling from 5->5/4 yr."""
     # Some constants.
+    Ns *= spread
     etaA = 0.7                          # Aperture efficiency.
-    Aeff = etaA*numpy.pi*(D/2)**2          # m^2
+    Aeff = etaA*np.pi*(D/2)**2          # m^2
     lam21= 0.21*(1+zz)                  # m
     nuobs= 1420/(1+zz)                  # MHz
     # The cosmology-dependent factors.
@@ -120,31 +121,91 @@ def thermal_n(k, mu, zz,D=6.0,Ns=256,att='reas'):
     # Eq. (3.3) of Chen++19
     d2V  = chi**2*2997.925/Ez*(1+zz)**2
     # Eq. (3.5) of Chen++19
-    n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
     kperp = k*numpy.sqrt(1-mu**2)
-    uu   = kperp*chi/(2*numpy.pi)
-    xx   = uu*lam21/Ns/D                # Dimensionless.
-    nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*numpy.exp(-xx**c5) * lam21**2 + 1e-30
-    #nbase[uu<   D/lam21    ]=1e-30
-    #nbase[uu>Ns*D/lam21*1.4]=1e-30
-    # Eq. (3.2) of Chen++19
+    if hex:    # Hexagonal array of Ns^2 elements.
+        n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.5698,-0.5274,0.8358,1.6635,7.3177
+        uu   = kperp*chi/(2*np.pi)
+        xx   = uu*lam21/Ns/D                # Dimensionless.
+        nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
+        #nbase[uu<   D/lam21    ]=1e-30
+        #nbase[uu>Ns*D/lam21*1.3]=1e-30
+    else:      # Square array of Ns^2 elements.
+        n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
+        uu   = kperp*chi/(2*np.pi)
+        xx   = uu*lam21/Ns/D                # Dimensionless.
+        nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
+        #nbase[uu<   D/lam21    ]=1e-30
+        #nbase[uu>Ns*D/lam21*1.4]=1e-30
+    # Eq. (3.2) of Chen++19, updated to match PUMA specs:
     npol = 2
     fsky = 0.5
     tobs = 5.*365.25*24.*3600.          # sec.
     if att == 'opt': tobs/= 1.0         # Scale to 1/2-filled array.
     elif att == 'reas': tobs/= 4.0      # Scale to 1/2-filled array
-    elif att == 'pess': tobs/= 16.0       # Scale to 1/2-filled array.
-    Tamp = 55.0                         # K
-    Tgnd = 30.0                         # K
+    elif att == 'pess': tobs/= 16.0     # Scale to 1/2-filled array.
+    tobs /= spread**2
+
+    # the signal entering OMT is given by eta_dish*T_s + (1-eta_dish)*T_g
+    # and after hitting both with eta_omt and adding amplifier noise you get:
+    # T_ampl + eta_omt.eta_dish.T_s + eta_omt(1-eta_dish)T_g
+    # so normalizing to have 1 in front of Ts we get
+    # T_ampl/(eta_omt*eta_dish) + T_g (1-eta_dish)/(eta_dish) + T_sky
+    # Putting in T_ampl=50K T_g=300K eta_omt=eta_dish=0.9 gives:
+    Tamp = 50.0/0.9**2                  # K
+    Tgnd = 300./0.9*(1-0.9)             # K
     Tsky = 2.7 + 25*(400./nuobs)**2.75  # K
     Tsys = Tamp + Tsky + Tgnd
     Omp  = (lam21/D)**2/etaA
     # Return Pth in "cosmological units", with the Tbar divided out.
     Pth  = (Tsys/Tbar)**2*(lam21**2/Aeff)**2 *\
-           4*numpy.pi*fsky/Omp/(npol*1420e6*tobs*nbase) * d2V
+           4*np.pi*fsky/Omp/(npol*1420e6*tobs*nbase) * d2V
     return(Pth)
     #
 
+
+##def thermal_n(k, mu, zz,D=6.0,Ns=256,att='reas', spread=1.):
+##    """The thermal noise for PUMA -- note noise rescaling."""
+##    # Some constants.
+##    Ns *= spread
+##    etaA = 0.7                          # Aperture efficiency.
+##    Aeff = etaA*numpy.pi*(D/2)**2          # m^2
+##    lam21= 0.21*(1+zz)                  # m
+##    nuobs= 1420/(1+zz)                  # MHz
+##    # The cosmology-dependent factors.
+##    hub  = cc.H(0).value / 100.0
+##    Ez   = cc.H(zz).value / cc.H(0).value
+##    chi  = cc.comoving_distance(zz).value * hub         # Mpc/h.
+##    OmHI = 4e-4*(1+zz)**0.6 / Ez**2
+##    Tbar = 0.188*hub*(1+zz)**2*Ez*OmHI  # K
+##    # Eq. (3.3) of Chen++19
+##    d2V  = chi**2*2997.925/Ez*(1+zz)**2
+##    # Eq. (3.5) of Chen++19
+##    n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
+##    kperp = k*numpy.sqrt(1-mu**2)
+##    uu   = kperp*chi/(2*numpy.pi)
+##    xx   = uu*lam21/Ns/D                # Dimensionless.
+##    nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*numpy.exp(-xx**c5) * lam21**2 + 1e-30
+##    #nbase[uu<   D/lam21    ]=1e-30
+##    #nbase[uu>Ns*D/lam21*1.4]=1e-30
+##    # Eq. (3.2) of Chen++19
+##    npol = 2
+##    fsky = 0.5
+##    tobs = 5.*365.25*24.*3600.          # sec.
+##    tobs /= spread**2
+##    if att == 'opt': tobs/= 1.0         # Scale to 1/2-filled array.
+##    elif att == 'reas': tobs/= 4.0      # Scale to 1/2-filled array
+##    elif att == 'pess': tobs/= 16.0     # Scale to 1/2-filled array.
+##    Tamp = 55.0                         # K
+##    Tgnd = 30.0                         # K
+##    Tsky = 2.7 + 25*(400./nuobs)**2.75  # K
+##    Tsys = Tamp + Tsky + Tgnd
+##    Omp  = (lam21/D)**2/etaA
+##    # Return Pth in "cosmological units", with the Tbar divided out.
+##    Pth  = (Tsys/Tbar)**2*(lam21**2/Aeff)**2 *\
+##           4*numpy.pi*fsky/Omp/(npol*1420e6*tobs*nbase) * d2V
+##    return(Pth)
+##    #
+##
 
 
 class NoiseModel(base.NoiseModel):
@@ -181,12 +242,15 @@ class NoiseModel(base.NoiseModel):
 
 
 class ThermalNoise(base.NoiseModel):
-    def __init__(self, pm, aa, seed=100, stage2='reas'):
+    def __init__(self, pm, aa, seed=100, stage2='reas', limk = 1.1, spread=1., hex=True):
         self.pm = pm
         self.aa = aa
         self.zz = 1/aa-1
         self.seed = seed
-        self.noise = lambda k, mu: thermal_n(k, mu, self.zz, att=stage2)
+        self.noise = lambda k, mu: thermal_n(k, mu, self.zz, att=stage2, spread=spread, hex=hex)
+        self.limk = limk
+        self.spread = spread
+        self.hex = hex
         #self.noise = lambda kp: thermal_n(kp, self.zz, att=stage2)
         #self.noise = thermalnoise(self.zz, stage2=True)
         
@@ -200,8 +264,11 @@ class ThermalNoise(base.NoiseModel):
         mumesh = kk[2]/kmesh
         #mumesh[mask] = 0
         kperp = (kk[0]**2 + kk[1]**2)**0.5
+        kperpmesh = kmesh*(1-mumesh**2)**0.5
         
         noiseth = self.noise(kmesh, mumesh)
+        nlim = self.noise(self.limk, 0)*10
+        noiseth[kperpmesh>self.limk] = nlim
         #noiseth = self.noise(kperp)
         noiseth = noiseth + kmesh*0
         if ipk is not None: noise = ipk(kmesh)
@@ -215,14 +282,17 @@ class ThermalNoise(base.NoiseModel):
         pm = obs.mapp.pm
         kk = obs.mapp.r2c().x
         kmesh = sum(i**2 for i in kk)**0.5
+        mask = kmesh == 0
         kmesh[kmesh == 0] = 1
         mumesh = kk[2]/kmesh
         kperp = (kk[0]**2 + kk[1]**2)**0.5
-        mask = kmesh == 0
         mumesh = kk[2]/kmesh
+        kperpmesh = kmesh*(1-mumesh**2)**0.5
         #mumesh[mask] = 0
         
         noisep = self.noise(kmesh, mumesh)
+        nlim = self.noise(self.limk, 0)*10
+        noisep[kperpmesh>self.limk] = nlim
         #noisep = self.noise(kperp)
         #noisep = noisep + kmesh*0
         #noise = noisep*0 + 1
@@ -232,8 +302,7 @@ class ThermalNoise(base.NoiseModel):
         else:
             n = pm.generate_whitenoise(mode='complex', seed=self.seed)
             n = (n * (noisep / pm.BoxSize.prod()) ** 0.5 ).c2r(out=Ellipsis)
-            #if pm.comm.rank == 0: print('Noise Variance check', (n ** 2).csum() / n.Nmesh.prod(), self.var)
-
+           #if pm.comm.rank == 0: print('Noise Variance check', (n ** 2).csum() / n.Nmesh.prod(), self.var)
         return Observable(mapp=obs.mapp + n, s=obs.s, d=obs.d)
 
 

@@ -51,7 +51,8 @@ if angle is None:
     angle = numpy.round(mapnoise.wedge(zz, att=cfg['mods']['wopt'], angle=True), 0)
 if rank == 0: 
     print(angle)
-    print(type(angle))
+try: spread
+except : spread = 1.
 
 if numd <= 0: num = -1
 else: num = int(bs**3 * numd)
@@ -62,12 +63,16 @@ map = getattr(lab, cfg['mods']['map'])
 
 #
 proj = '/project/projectdirs/cosmosim/lbl/chmodi/cosmo4d/'
-dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100-fixed/'%(nsteps, B, bs, nc)
+if ray: dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100/'%(nsteps, B, bs, nc)
+else: dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100-fixed/'%(nsteps, B, bs, nc)
 
-ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_ang%.1f/L%04d-N%04d/'%(aa, kmin, angle, bs, nc)
+if cfg['mods']['angle'] is not None: ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_ang%0.2f/L%04d-N%04d/'%(aa, kmin, cfg['mods']['angle'], bs, nc)
+else: ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_%s/L%04d-N%04d/'%(aa, kmin, cfg['mods']['wopt'], bs, nc)
+if ray: ofolder = ofolder[:-1]+'-R/'
 if stage2 is not None:
-    if stage2: ofolder += 'thermal-%s/'%stage2
-    #else: ofolder += 'stage0/'
+    ofolder += 'thermal-%s/'%stage2
+if hex: ofolder = ofolder[:-1] + '-hex/'
+if spread != 1: ofolder = ofolder[:-1] + '-sp%.1f/'%spread
 if pmdisp: 
     ofolder += 'T%02d-B%01d/'%(nsteps, B)
 else: ofolder += 'ZA/'
@@ -84,18 +89,21 @@ for folder in [ofolder, optfolder]:
     try: os.makedirs(folder)
     except:pass
 
-
 ####################################
 #initiate
 
 if rsdpos:
-    hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImeshz-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
+    if ray: hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100/fastpm_%0.4f/HImeshz-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
+    else: hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImeshz-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
     if rsdpos: 
-        with open('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/2560-9100-fixed/fastpm_%0.4f/Header/attr-v2'%aa) as ff:
+        if ray: pp = '/global/cscratch1/sd/chmodi/m3127/H1mass/highres/10240-9100/fastpm_%0.4f/Header/attr-v2'%aa
+        else: pp = '/global/cscratch1/sd/chmodi/m3127/H1mass/highres/10240-9100-fixed/fastpm_%0.4f/Header/attr-v2'%aa
+        with open(pp) as ff:
             for line in ff.readlines(): 
                 if 'RSDFactor' in line: rsdfac = float(line.split()[-2])
 else: 
-    hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImesh-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
+    if ray: hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100/fastpm_%0.4f/HImesh-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
+    else : hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100-fixed/fastpm_%0.4f/HImesh-N%04d/'%(bs*10, aa, nc), 'ModelA').paint()
     rsdfac = 0
 rsdfac *= 100./aa ##Add hoc factor due to incorrect velocity dimensions in nbody.py
 
@@ -121,8 +129,8 @@ else: dynamic_model = ZAModel(cosmo, truth_pm, B=B, steps=stages)
 if rank == 0: print(dynamic_model)
 
 #noise
-if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, stage2=stage2)
-else: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=None, aa=aa, stage2=stage2)
+if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, stage2=stage2,spread=spread, hex=hex)
+else: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=None, aa=aa, stage2=stage2,spread=spread, hex=hex)
 wedge_noise_model = mapnoise.WedgeNoiseModel(pm=truth_pm, power=1, seed=100, kmin=kmin, angle=angle)
 #Create and save data if not found
 
@@ -142,8 +150,6 @@ try:
 except: 
     data_n = truth_noise_model.add_noise(data_p)
     data_n.save(optfolder+'datan/')
-data_n = truth_noise_model.add_noise(data_p)
-data_n.save(optfolder+'datan/')
 
 try: data_w = map.Observable.load(optfolder+'/dataw')
 except: 
@@ -192,16 +198,47 @@ if rank == 0: print('Setup done')
 
 #########################################
 #Optimizer  
-if cfg['init']['sinit'] is None:
+#Initialize
+smoothings = [0, 0.5, 1., 2., 4.] 
+inpath = None
+for ir, r in enumerate(smoothings):
+    if os.path.isdir(optfolder + '/%d-%0.2f/best-fit'%(nc, r)): 
+        inpath = optfolder + '/%d-%0.2f//best-fit'%(nc, r)
+        sms = smoothings[:ir][::-1]
+        lit = 100
+        if r == 0:
+            if rank == 0:print('\nAll done here already\nExiting\n')
+            sys.exit()
+    else:
+        for iiter in range(100, -1, -20):
+            path = optfolder + '/%d-%0.2f//%04d/fit_p/'%(nc, r, iiter)
+            if os.path.isdir(path): 
+                inpath = path
+                sms = smoothings[:ir+1][::-1]
+                lit = 100 - iiter
+                break
+    if inpath is not None:
+        break
+
+if inpath is not None:
+    if rank == 0: print(inpath)
+    s_init = BigFileMesh(inpath, 's').paint()
+else:
     s_init = truth_pm.generate_whitenoise(777, mode='complex')\
         .apply(lambda k, v: v * (ipk(sum(ki **2 for ki in k) **0.5) / v.BoxSize.prod()) ** 0.5)\
         .c2r()*0.001
     sms = [4.0, 2.0, 1.0, 0.5, 0.0]
-else: 
-    s_init = BigFileMesh(cfg['init']['sinit'], 's').paint()
-    sms = cfg['init']['sms']
-    if sms is None: [4.0, 2.0, 1.0, 0.5, 0.0]
-
+    lit = 100
+##if cfg['init']['sinit'] is None:
+##    s_init = truth_pm.generate_whitenoise(777, mode='complex')\
+##        .apply(lambda k, v: v * (ipk(sum(ki **2 for ki in k) **0.5) / v.BoxSize.prod()) ** 0.5)\
+##        .c2r()*0.001
+##    sms = [4.0, 2.0, 1.0, 0.5, 0.0]
+##else: 
+##    s_init = BigFileMesh(cfg['init']['sinit'], 's').paint()
+##    sms = cfg['init']['sms']
+##    if sms is None: [4.0, 2.0, 1.0, 0.5, 0.0]
+##
 x0 = s_init
 N0 = nc
 C = x0.BoxSize[0] / x0.Nmesh[0]
@@ -214,9 +251,12 @@ for Ns in sms:
     maxiter = 100
     run = '%d-%0.2f'%(N0, Ns)
     if Ns == sms[0]:
-        if cfg['init']['sinit'] is not None: 
-            run += '-nit_%d-sm_%.2f'%(cfg['init']['nit'], cfg['init']['sml'])
-            maxiter -= int(cfg['init']['nit'])
+#        if cfg['init']['sinit'] is not None: 
+#            run += '-nit_%d-sm_%.2f'%(cfg['init']['nit'], cfg['init']['sml'])
+#            maxiter -= int(cfg['init']['nit'])
+        if inpath is not None:
+            run += '-nit_%d-sm_%.2f'%(iiter, smoothings[ir])
+            maxiter = lit
     if maxiter > 0:
         obj = objfunc(mock_model, truth_noise_model, data_n, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle, ivarmesh=ivarmesh)
         x0 = solve(N0, x0, rtol, run, Ns, prefix, mock_model, obj, data_p, truth_pm, optfolder, \
