@@ -47,19 +47,23 @@ import argparse
 parser = argparse.ArgumentParser()
 #parser.add_argument('-m', '--model', help='model name to use')
 parser.add_argument('-a', '--aa', help='scale factor', default=0.3333, type=float)
-parser.add_argument('-l', '--bs', help='boxsize', default=256, type=float)
-parser.add_argument('-n', '--nmesh', help='nmesh', default=128, type=int)
+parser.add_argument('-l', '--bs', help='boxsize', default=1024, type=float)
+parser.add_argument('-n', '--nmesh', help='nmesh', default=256, type=int)
 parser.add_argument('-t', '--angle', help='angle of the wedge', default=50, type=float)
-parser.add_argument('-k', '--kmin', help='kmin of the wedge', default=0.01, type=float)
+parser.add_argument('-k', '--kmin', help='kmin of the wedge', default=0.03, type=float)
+parser.add_argument( '--pp', help='upsample', default=0) 
+
 args = parser.parse_args()
 
 figpath = './figs/'
 
 bs, nc, aa = args.bs, args.nmesh, args.aa
+nc2 = nc*2
 zz = 1/aa- 1
 kmin = args.kmin
 ang = args.angle
-pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
+if args.pp: pm = ParticleMesh(BoxSize=bs, Nmesh=[nc2, nc2, nc2])
+else: pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
 rank = pm.comm.rank
 
 ################
@@ -87,15 +91,27 @@ def make_rep_plot():
                     #dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, 0.03, angle)
                     dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_%s/'%(aa, 0.03, wopt)
                     dpath += 'L%04d-N%04d-R//thermal-%s-hex/ZA/opt_s999_h1massA_fourier_rsdpos/'%(bs, nc, thopt)
-                    datapp = mapp.Observable.load(dpath+'/datap')
-                    bpaths = [dpath+'%d-0.00//best-fit'%nc] + [dpath + '%d-0.00//%04d/fit_p/'%(nc,i) for i in range(100, 50, -20)]
-                    for path in bpaths:
-                        if os.path.isdir(path): 
-                            break
-                    if rank == 0: print(path)
-                    bfit = mapp.Observable.load(path)
-                    #bfit = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/best-fit/')
-                    rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
+                    fname = './tmpdata/mapp-L%04d_%0.4f_kmin%0.2f_%s-th%shex.txt'%(bs, aa, 0.03, wopt, thopt)
+                    if args.pp : fname = fname[:-4] + '-up.txt'
+                    try:
+                        rep = np.loadtxt(fname).T
+                        rpfit = [{'k':rep[0], 'power':rep[i+1]} for i in range(3)]
+                    except:
+                        if args.pp:
+                            datapp = mapp.Observable.load(dpath+'/datap_up')
+                            bpaths = [dpath+'upsample2/%d-0.00//best-fit'%nc2] + [dpath + 'upsample2/%d-0.00//%04d/fit_p/'%(nc2,i) for i in range(100, 50, -20)]
+                        else:
+                            datapp = mapp.Observable.load(dpath+'/datap')
+                            bpaths = [dpath+'%d-0.00//best-fit'%nc] + [dpath + '%d-0.00//%04d/fit_p/'%(nc,i) for i in range(100, 50, -20)]
+                        for path in bpaths:
+                            if os.path.isdir(path): 
+                                break
+                        if rank == 0: print(path)
+                        bfit = mapp.Observable.load(path)
+                        #bfit = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/best-fit/')
+                        rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
+                        if rank == 0: np.savetxt(fname, np.stack([rpfit[0]['k']]+ [rpfit[i]['power'].real for i in range(len(rpfit))]).T, header='k, pr, pd, px')
+
                     if ia == 0 and iw == 0:
                         if thopt == 'reas': thopt = 'fid'
                         lbl = 'Noise - %s'%thopt
@@ -132,7 +148,8 @@ def make_rep_plot():
             tick.label.set_fontproperties(fontmanage)
     ##and finish
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    if rank  == 0: plt.savefig(figpath + '/allcompare_L%04d-hex.pdf'%(bs))
+    if rank  == 0 and not args.pp: plt.savefig(figpath + '/allcompare_L%04d-hex.pdf'%(bs))
+    if rank  == 0 and args.pp: plt.savefig(figpath + '/allcompare_L%04d-hexup.pdf'%(bs))
 
 
 
@@ -161,15 +178,28 @@ def make_repwd_plot():
                     #dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, 0.03, angle)
                     dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_%s/'%(aa, 0.03, wopt)
                     dpath += 'L%04d-N%04d-R//thermal-%s-hex/ZA/opt_s999_h1massA_fourier_rsdpos/'%(bs, nc, thopt)
-                    datapp = mapp.Observable.load(dpath+'/datap')
-                    bpaths = [dpath+'%d-0.00//best-fit'%nc] + [dpath + '%d-0.00//%04d/fit_p/'%(nc,i) for i in range(100, 50, -20)]
-                    for path in bpaths:
-                        if os.path.isdir(path): 
-                            break
-                    if rank == 0: print(path)
-                    bfit = mapp.Observable.load(path)
-                    #bfit = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/best-fit/')
-                    rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
+                    fname = './tmpdata/mapp-L%04d_%0.4f_kmin%0.2f_%s-th%shex.txt'%(bs, aa, 0.03, wopt, thopt)
+                    if args.pp : fname = fname[:-4] + '-up.txt'
+                    try:
+                        rep = np.loadtxt(fname).T
+                        rpfit = [{'k':rep[0], 'power':rep[i+1]} for i in range(3)]
+                    except:
+                        if args.pp:
+                            datapp = mapp.Observable.load(dpath+'/datap_up')
+                            bpaths = [dpath+'upsample2/%d-0.00//best-fit'%nc2] + [dpath + 'upsample2/%d-0.00//%04d/fit_p/'%(nc2,i) for i in range(100, 50, -20)]
+                        else:
+                            datapp = mapp.Observable.load(dpath+'/datap')
+                            bpaths = [dpath+'%d-0.00//best-fit'%nc] + [dpath + '%d-0.00//%04d/fit_p/'%(nc,i) for i in range(100, 50, -20)]
+                        for path in bpaths:
+                            if os.path.isdir(path): 
+                                break
+                        if rank == 0: print(path)
+                        bfit = mapp.Observable.load(path)
+                        #bfit = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/best-fit/')
+                        rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
+                        if rank == 0: np.savetxt(fname, np.stack([rpfit[0]['k']]+ [rpfit[i]['power'].real for i in range(len(rpfit))]).T, header='k, pr, pd, px')
+
+
                     if ia == 0 and iw == 0:
                         if thopt == 'reas': thopt = 'fid'
                         lbl = 'Noise - %s'%thopt
@@ -184,8 +214,10 @@ def make_repwd_plot():
 
 
     for ia, aa  in enumerate([0.3333, 0.2000, 0.1429]):
+    #for ia, aa  in enumerate([0.3333]):
         zz = 1/aa-1
         for iw, wopt in enumerate(['opt', 'pess']):
+        #for iw, wopt in enumerate(['opt']):
             lss = linestyle[iw]
             for it, thopt in enumerate(['opt', 'pess', 'reas']):
                 if rank == 0: print(aa, wopt, thopt)
@@ -196,10 +228,23 @@ def make_repwd_plot():
                     #dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, 0.03, angle)
                     dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_%s/'%(aa, 0.03, wopt)
                     dpath += 'L%04d-N%04d-R//thermal-%s-hex/ZA/opt_s999_h1massA_fourier_rsdpos/'%(bs, nc, thopt)
-                    datapp = mapp.Observable.load(dpath+'/datap')
-                    bfit = mapp.Observable.load(dpath+'/dataw')
-                    #bfit = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/best-fit/')
-                    rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
+                    fname = './tmpdata/datan-L%04d_%0.4f_kmin%0.2f_%s-th%shex.txt'%(bs, aa, 0.03, wopt, thopt)
+                    if args.pp : fname = fname[:-4] + '-up.txt'
+                    try:
+                        rep = np.loadtxt(fname).T
+                        rpfit = [{'k':rep[0], 'power':rep[i+1]} for i in range(3)]
+                    except:
+                        if args.pp:
+                            datapp = mapp.Observable.load(dpath+'/datap_up')
+                            bfit = mapp.Observable.load(dpath+'/dataw_up')
+                        else:
+                            datapp = mapp.Observable.load(dpath+'/datap')
+                            bfit = mapp.Observable.load(dpath+'/dataw')
+                        #bfit = mapp.Observable.load(dpath+'ZA/opt_s999_h1massA_fourier_rsdpos/best-fit/')
+                        rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
+                        if rank == 0: np.savetxt(fname, np.stack([rpfit[0]['k']]+ [rpfit[i]['power'].real for i in range(len(rpfit))]).T, header='k, pr, pd, px')
+
+
                     if ia == 0 and iw == 0:
                         lbl = 'Noise - %s'%thopt
                     elif ia == 1 and it == 0:
@@ -207,7 +252,7 @@ def make_repwd_plot():
                     else: lbl = None
                     ax[0].plot(rpfit[0]['k'], rpfit[0]['power']/(rpfit[1]['power']*rpfit[2]['power'])**0.5, ls=lss, lw=1, color=cc, alpha=0.5)
                     ax[1].plot(rpfit[0]['k'], (rpfit[1]['power']/rpfit[2]['power'])**0.5, ls=lss, lw=1, color=cc, alpha=0.5)
-                    ax[1].text(0.02, 2, r'$z = %.2f$'%zz,color='black',ha='left',va='bottom', fontdict=font)
+                    ax[1].text(0.02, 1.2, r'$z = %.2f$'%zz,color='black',ha='left',va='bottom', fontdict=font)
                 except Exception as e: 
                     if rank == 0: print(e)
 
@@ -217,7 +262,7 @@ def make_repwd_plot():
         axis.set_ylim(-0.05, 1.1)
     for axis in axar[:, 1]: 
         axis.set_ylabel(r'$T_f$', fontdict=font)
-        axis.set_ylim(-0.05, 3)
+        axis.set_ylim(-0.05, 1.5)
     for axis in axar[2, :]: axis.set_xlabel(r'$k\quad [h\,{\rm Mpc}^{-1}]$', fontdict=font)
     for axis in axar.flatten():
         axis.axhline(1, color='k', ls=':')
@@ -233,7 +278,8 @@ def make_repwd_plot():
             tick.label.set_fontproperties(fontmanage)
     ##and finish
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    if rank  == 0: plt.savefig(figpath + '/allcomparewd_L%04d-hex.pdf'%(bs))
+    if rank  == 0 and not args.pp: plt.savefig(figpath + '/allcomparewd_L%04d-hex.pdf'%(bs))
+    if rank  == 0 and args.pp: plt.savefig(figpath + '/allcomparewd_L%04d-hexup.pdf'%(bs))
 
 
 ################

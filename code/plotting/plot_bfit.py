@@ -350,7 +350,7 @@ def make_biask_plot():
 
 
 
-def make_bsum_plot():
+def make_bsum_plot(bs=1024, nc=256):
     """bias rcc, tf, error, bk"""
     
 
@@ -367,33 +367,37 @@ def make_bsum_plot():
         if noises[0][i] == np.round(1/aa-1, 2): noise = noises[3][i]
     print(noise)
 
-    zamod = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/fitp/', 'mapp').paint()
-    try: pmmod = BigFileMesh(dpath+'T05-B1/opt_s999_h1massA_fourier/fitp/', 'mapp').paint()
-    except Exception as e:
-        print(e)
-        lin = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/datap/', 's').paint()
-        dyn = BigFileCatalog('/global/cscratch1/sd/chmodi/m3127/cm_lowres/5stepT-B1/%d-%d-9100-fixed/fastpm_%0.4f/1'%(bs, nc, aa))
-        fpos = dyn['Position']
-        _, pmmod = getbias(pm, basemesh=lin, hmesh=hmesh, pos=fpos, grid=grid, fpos=fpos)
+    ik = 20
+
+##    zamod = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/fitp/', 'mapp').paint()
+##    try: pmmod = BigFileMesh(dpath+'T05-B1/opt_s999_h1massA_fourier/fitp/', 'mapp').paint()
+##    except Exception as e:
+##        print(e)
+##        lin = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/datap/', 's').paint()
+##        dyn = BigFileCatalog('/global/cscratch1/sd/chmodi/m3127/cm_lowres/5stepT-B1/%d-%d-9100-fixed/fastpm_%0.4f/1'%(bs, nc, aa))
+##        fpos = dyn['Position']
+##        _, pmmod = getbias(pm, basemesh=lin, hmesh=hmesh, pos=fpos, grid=grid, fpos=fpos, ik=ik)
+##
+    lin = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/datap/', 's').paint()
+    dyn = BigFileCatalog('/global/cscratch1/sd/chmodi/m3127/cm_lowres/5stepT-B1/%d-%d-9100-fixed/fastpm_%0.4f/1'%(bs, nc, aa))
+    fpos = dyn['Position']
+    dgrow = cosmo.scale_independent_growth_factor(zz)
+    zapos = za.doza(lin.r2c(), grid, z=zz, dgrow=dgrow)
+    _, zamod = getbias(pm, basemesh=lin, hmesh=hmesh, pos=zapos, grid=grid, ik=ik)
+    _, pmmod = getbias(pm, basemesh=lin, hmesh=hmesh, pos=fpos, grid=grid, ik=ik)
 
     fin = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/datap/', 'd').paint()
     fin /= fin.cmean()
     fin -= 1
     finsm = ft.smooth(fin, 3, 'gauss')
-    params, finmod = getbias(pm, basemesh=finsm, hmesh=hmesh, pos=grid, grid=grid)
+    _, finmod = getbias(pm, basemesh=finsm, hmesh=hmesh, pos=grid, grid=grid, ik=ik)
     models = [zamod, pmmod, finmod, finsm.copy()]
     lbls = ['ZA shift', 'PM shift', 'Eulerian (R=3)', 'Eulerian (R=3), $b_1^E$']
     lss = ['-', '-', '-', '--']
 
+    paramsza, _ = getbias(pm, basemesh=lin, hmesh=hmesh, pos=zapos, grid=grid, ik=ik)
+    kk, paramszak, _ = getbiask(pm, basemesh=lin, hmesh=hmesh, pos=zapos, grid=grid)
 
-    lin = BigFileMesh(dpath+'ZA/opt_s999_h1massA_fourier/datap/', 's').paint()
-    dyn = BigFileCatalog('/global/cscratch1/sd/chmodi/m3127/cm_lowres/5stepT-B1/%d-%d-9100-fixed/fastpm_%0.4f/1'%(bs, nc, aa))
-    dgrow = cosmo.scale_independent_growth_factor(zz)
-    zapos = za.doza(lin.r2c(), grid, z=zz, dgrow=dgrow)
-    fpos = dyn['Position']
-
-    params, _ = getbias(pm, basemesh=lin, hmesh=hmesh, pos=zapos, grid=grid)
-    kk, paramsk, _ = getbiask(pm, basemesh=lin, hmesh=hmesh, pos=zapos, grid=grid)
 
     print('Setup done')
     #####
@@ -427,8 +431,8 @@ def make_bsum_plot():
          
     lbls = ['$b_1$', '$b_2$', '$b_s$']
     for ii in range(3):
-        ax[1, 1].plot(kk, paramsk[ii], lw=2, color='C%d'%ii, label=lbls[ii])
-        ax[1, 1].axhline(params[ii], lw=1, color='C%d'%ii, ls="--")
+        ax[1, 1].plot(kk, paramszak[ii], lw=2, color='C%d'%ii, label=lbls[ii])
+        ax[1, 1].axhline(paramsza[ii], lw=1, color='C%d'%ii, ls="--")
         ax[1, 1].set_ylabel(r'$b(k)$', fontdict=font)
 
     for axis in ax.flatten():
@@ -437,6 +441,7 @@ def make_bsum_plot():
         axis.legend(prop=fontmanage)
         axis.set_xlabel(r'$k\quad [h\,{\rm Mpc}^{-1}]$', fontdict=font)
         axis.set_xscale('log')
+        axis.axvline(kk[ik], color='k', ls="--")
 
     # Put on some more labels.
     for axis in ax.flatten():

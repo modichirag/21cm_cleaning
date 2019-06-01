@@ -42,16 +42,19 @@ parser.add_argument('-a', '--aa', help='scale factor', default=0.3333, type=floa
 parser.add_argument('-l', '--bs', help='boxsize', default=256, type=float)
 parser.add_argument('-n', '--nmesh', help='nmesh', default=128, type=int)
 parser.add_argument('-t', '--angle', help='angle of the wedge', default=50, type=float)
-parser.add_argument('-k', '--kmin', help='kmin of the wedge', default=0.01, type=float)
+parser.add_argument('-k', '--kmin', help='kmin of the wedge', default=0.03, type=float)
+parser.add_argument( '--up', help='upsample', default=0) 
 args = parser.parse_args()
 
 figpath = './figs/'
 
 bs, nc, aa = args.bs, args.nmesh, args.aa
+nc2 = nc*2
 zz = 1/aa- 1
 kmin = args.kmin
 ang = args.angle
-pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
+if args.up: pm = ParticleMesh(BoxSize=bs, Nmesh=[nc2, nc2, nc2])
+else: pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
 rank = pm.comm.rank
 
 dpath = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%0.2f_ang%0.1f/'%(aa, kmin, ang)

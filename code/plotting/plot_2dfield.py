@@ -44,6 +44,7 @@ parser.add_argument('-n', '--nmesh', help='nmesh', default=256, type=int)
 parser.add_argument('-t', '--angle', help='angle of the wedge', default=50, type=float)
 parser.add_argument('-k', '--kmin', help='kmin of the wedge', default=0.03, type=float)
 parser.add_argument('-r', '--rsdpos', help='kmin of the wedge', default=True, type=bool)
+parser.add_argument('--pp', help='upsample', default=0)
 args = parser.parse_args()
 
 figpath = './figs/'
@@ -70,9 +71,14 @@ def make_rep_plot():
 
     fpath = 'ZA/opt_s999_h1massA_fourier'
     if args.rsdpos : fpath += '_rsdpos/'
-    dataprsd = mapp.Observable.load(dpath+fpath+'/datap').mapp[...]
-    dataprsdw = mapp.Observable.load(dpath+fpath+'/dataw').mapp[...]
+    if args.pp: 
+        dataprsd = mapp.Observable.load(dpath+fpath+'/datap_up').mapp[...]
+        dataprsdw = mapp.Observable.load(dpath+fpath+'/dataw_up').mapp[...]
+    else:
+        dataprsd = mapp.Observable.load(dpath+fpath+'/datap').mapp[...]
+        dataprsdw = mapp.Observable.load(dpath+fpath+'/dataw').mapp[...]
     basepath = dpath+fpath+'/%d-0.00/'%(nc)
+    if args.pp: basepath = dpath+fpath+'upsample2/%d-0.00/'%(nc)
     bpaths = [basepath+'/best-fit'] + [basepath + '/%04d/fit_p/'%i for i in range(100, -1, -20)]
     for path in bpaths:
         if os.path.isdir(path): break
@@ -109,7 +115,8 @@ def make_rep_plot():
     ax[1, 0].set_ylabel('Y', fontdict=font)
     ax[2, 0].set_ylabel('Z', fontdict=font)
 
-    plt.savefig(figpath + '/map_L%04d_%04d.pdf'%(bs, aa*10000))
+    if args.pp: plt.savefig(figpath + '/map_L%04d_%04d-up.pdf'%(bs, aa*10000))
+    else: plt.savefig(figpath + '/map_L%04d_%04d.pdf'%(bs, aa*10000))
 
 
 
