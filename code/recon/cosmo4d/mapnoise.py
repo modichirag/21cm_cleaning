@@ -127,15 +127,17 @@ def thermal_n(k, mu,zz,D=6.0,Ns=256,att='reas', spread=1, hex=True):
         uu   = kperp*chi/(2*np.pi)
         xx   = uu*lam21/Ns/D                # Dimensionless.
         nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
-        #nbase[uu<   D/lam21    ]=1e-30
-        #nbase[uu>Ns*D/lam21*1.3]=1e-30
+        #return nbase
+        nbase[nbase < 0] = 1e-30
+        nbase[uu<   D/lam21    ]=1e-30
+        nbase[uu>Ns*D/lam21*1.3]=1e-30
     else:      # Square array of Ns^2 elements.
         n0,c1,c2,c3,c4,c5 = (Ns/D)**2,0.4847,-0.33,1.3157,1.5974,6.8390
         uu   = kperp*chi/(2*np.pi)
         xx   = uu*lam21/Ns/D                # Dimensionless.
         nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-30
-        #nbase[uu<   D/lam21    ]=1e-30
-        #nbase[uu>Ns*D/lam21*1.4]=1e-30
+        nbase[uu<   D/lam21    ]=1e-30
+        nbase[uu>Ns*D/lam21*1.4]=1e-30
     # Eq. (3.2) of Chen++19, updated to match PUMA specs:
     npol = 2
     fsky = 0.5
@@ -267,8 +269,8 @@ class ThermalNoise(base.NoiseModel):
         kperpmesh = kmesh*(1-mumesh**2)**0.5
         
         noiseth = self.noise(kmesh, mumesh)
-        nlim = self.noise(self.limk, 0)*10
-        noiseth[kperpmesh>self.limk] = nlim
+        #nlim = self.noise(self.limk, 0)*10
+        #noiseth[kperpmesh>self.limk] = nlim
         #noiseth = self.noise(kperp)
         noiseth = noiseth + kmesh*0
         if ipk is not None: noise = ipk(kmesh)
@@ -291,8 +293,8 @@ class ThermalNoise(base.NoiseModel):
         #mumesh[mask] = 0
         
         noisep = self.noise(kmesh, mumesh)
-        nlim = self.noise(self.limk, 0)*10
-        noisep[kperpmesh>self.limk] = nlim
+        #nlim = self.noise(self.limk, 0)*10
+        #noisep[kperpmesh>self.limk] = nlim
         #noisep = self.noise(kperp)
         #noisep = noisep + kmesh*0
         #noise = noisep*0 + 1

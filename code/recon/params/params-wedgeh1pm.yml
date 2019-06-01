@@ -15,6 +15,7 @@ basep:
     numd : -1
     noisevar : 0.01
     rsdpos: False
+    prefix : null
 
 init: 
     sinit: null

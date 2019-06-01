@@ -79,7 +79,7 @@ if pmdisp:
 else: ofolder += 'ZA/'
 if prefix is None:
     prefix = '_fourier'
-    if rsdpos: prefix += "_rsdpos"
+    if rsdpos: prefix += "_rsdpos_2"
 
 fname = 's999_h1massA%s'%prefix
 optfolder = ofolder + 'opt_%s/'%fname
@@ -127,7 +127,7 @@ d_truth = new_pm.paint(dyn['Position'], layout=dlayout)
 
 
 
-#####
+##
 #Model
 params = numpy.loadtxt(optfolder + '/params.txt')
 
@@ -142,11 +142,15 @@ else: truth_noise_model = mapnoise.ThermalNoise(new_pm, seed=None, aa=aa, stage2
 wedge_noise_model = mapnoise.WedgeNoiseModel(pm=new_pm, power=1, seed=100, kmin=kmin, angle=angle)
 #Create and save data if not found
 
+
+#################
+
 mock_model = map.MockModel(dynamic_model, params=params, rsdpos=rsdpos, rsdfac=rsdfac)
 try: data_p = map.Observable.load(optfolder+'/datap_up')
 except: 
     data_p = map.Observable(hmesh, d_truth, s_truth)
     data_p.save(optfolder+'datap_up/')
+
 
 try: 
     data_n = map.Observable.load(optfolder+'/datan_up')
@@ -173,14 +177,10 @@ if stage2 is not None:
         ivarmesh = BigFileMesh(optfolder + 'ivarmesh_up', 'ivar').paint()
         ipkerror = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
     except:
-        #pkerror = FFTPower(data_n.mapp, second=-1* fit_p.mapp, mode='1d').power
-        #kerror, perror = pkerror['k'], pkerror['power']
         kerror, perror = eval_bfit(data_n.mapp, fit_p.mapp, optfolder, noise=noise, title=title, fsize=15, suff='-noiseup')        
         ipkerror = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
         if rank ==0: numpy.savetxt(optfolder + '/error_psnup.txt', numpy.array([kerror, perror]).T, header='kerror, perror')
 
-        #pkerror = FFTPower(data_p.mapp, second=-1* fit_p.mapp, mode='1d').power
-        #kerror, perror = pkerror['k'], pkerror['power']
         kerror, perror = eval_bfit(data_p.mapp, fit_p.mapp, optfolder, noise=noise, title=title, fsize=15, suff='-up')        
         ipkmodel = interp1d(kerror, perror, bounds_error=False, fill_value=(perror[0], perror[-1]))
         ivarmesh = truth_noise_model.get_ivarmesh(data_p, ipkmodel)
@@ -203,7 +203,7 @@ if rank == 0: print('Setup done')
 smoothings = cfg['basep']['sms'][::-1]
 nsm = len(smoothings)
 
-outfolder = optfolder + '/upsample%d/'%nsm
+outfolder = optfolder + '/upsample%d-nolimk/'%nsm
 x0 =  optfolder + '/%d-%0.2f/best-fit/'%(nc, 0)
 inpath = None
 #if os.path.isdir(outfolder): 
@@ -230,7 +230,7 @@ try:
         s_init = BigFileMesh(inpath, 's').paint()
 
 except Exception as e:
-    if rank == 0: print(e)
+    if rank == 0: print('Exception :', e)
     x0 =  optfolder + '/%d-%0.2f/best-fit/'%(nc, 0)
     s_init = BigFileMesh(x0, 's').paint()
     if rank == 0: print('Upsampling inint\n%s'%x0)

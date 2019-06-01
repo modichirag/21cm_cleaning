@@ -8,7 +8,7 @@ basep:
     seed : 100
     nsteps : 5
     B : 1
-    aa : 0.2000
+    aa : 1.000
     pmdisp : False
     masswt : True
     nfsteps : 40

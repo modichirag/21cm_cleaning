@@ -48,7 +48,7 @@ def shear(pm, base):
 
 
 
-def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None):
+def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20):
 
     if pm.comm.rank == 0: print('Will fit for bias now')
 
@@ -89,7 +89,7 @@ def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None):
         pxedd2 = FFTPower(ed, second=ed2, mode='1d').power['power']
         pxeds2 = FFTPower(ed, second=es2, mode='1d').power['power']
 
-    def ftomin(bb, ii=20, retp = False):
+    def ftomin(bb, ii=ik, retp = False):
         b1, b2, bs = bb
         pred = b1**2 *ped0 + b2**2*ped2 + 2*b1*b2*pxed0d2 
         pred += bs**2 *pes2 + 2*b1*bs*pxed0s2 + 2*b2*bs*pxed2s2

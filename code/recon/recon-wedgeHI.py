@@ -129,7 +129,7 @@ else: dynamic_model = ZAModel(cosmo, truth_pm, B=B, steps=stages)
 if rank == 0: print(dynamic_model)
 
 #noise
-if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, stage2=stage2,spread=spread, hex=hex)
+if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, stage2=stage2,spread=spread, hex=hex, limk=2)
 else: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=None, aa=aa, stage2=stage2,spread=spread, hex=hex)
 wedge_noise_model = mapnoise.WedgeNoiseModel(pm=truth_pm, power=1, seed=100, kmin=kmin, angle=angle)
 #Create and save data if not found

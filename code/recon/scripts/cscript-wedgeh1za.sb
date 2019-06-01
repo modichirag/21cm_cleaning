@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH -J recwedh1za
-#SBATCH -N 4
-#SBATCH -p debug
-#SBATCH -t 00:30:00
+#SBATCH -N 8
+#SBATCH -p regular
+#SBATCH -t 01:30:00
 #SBATCH -o ./log_slurm/%x.o%j
 #SBATCH -L cscratch1
 #SBATCH -C haswell
@@ -29,4 +29,4 @@ bcast-pip -U --no-deps /global/homes/c/chmodi/Programs/abopt
 ##source /global/homes/c/chmodi/.conda/envs/fastpm/bin/activate
 echo 'Finally starting'
 
-time srun -n 128 python -u recon-wedgeHI.py params/params-wedgeh1za.yml
+time srun -n 256 python -u recon-wedgeHI.py params/params-wedgeh1za.yml
