@@ -1,7 +1,7 @@
 import warnings
 from mpi4py import MPI
 rank = MPI.COMM_WORLD.rank
-#warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore")
 if rank!=0: warnings.filterwarnings("ignore")
 
 import numpy
@@ -161,14 +161,15 @@ beta = bias/ff
 usenoise = True
 if usenoise:
     if rank == 0: print('Use noise')
-    truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, att=stage2,spread=spread, hex=hex, limk=2, Ns=Ndish, checkbase=False)
+    truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, att=stage2,spread=spread, hex=hex, limk=2, Ns=Ndish, checkbase=False, nmin=None)
     data_p = truth_noise_model.add_noise(data_p)
 
 position = truth_pm.generate_uniform_particle_grid(shift=0)
 layout = truth_pm.decompose(position)
 
 rho = data_p.mapp
-rho = std.decic(rho)
+if aa == 0.1429 and cfg['mods']['wopt'] == 'opt': rho = std.gauss(data_p.mapp, 2*bs/ncd)
+else: rho = std.decic(rho)
 rho = std.apply_wedge(rho, kmin, angle)
 rhomass = rho.readout(position, layout=layout)
 if rank == 0: print(rhomass)

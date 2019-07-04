@@ -104,7 +104,7 @@ def thermalnoise(z, stage2=True, mK=False, retn=False):
 
 
 
-def thermal_n(k, mu,zz,D=6.0,Ns=256,att='reas', spread=1, hex=True, checkbase=True):
+def thermal_n(k, mu,zz,D=6.0,Ns=256,att='reas', spread=1, hex=True, checkbase=True, nmin=None):
     """The thermal noise for PUMA -- note noise rescaling from 5->5/4 yr."""
     # Some constants.
     Ns *= spread
@@ -127,10 +127,16 @@ def thermal_n(k, mu,zz,D=6.0,Ns=256,att='reas', spread=1, hex=True, checkbase=Tr
         uu   = kperp*chi/(2*np.pi)
         xx   = uu*lam21/Ns/D                # Dimensionless.
         nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-10
-        nmin = nbase[nbase > 0].min()
-        print(nmin)
-        if nmin < 1e-3: nmin  = 1e-3
-        nbase[nbase < 0] = nmin
+        if nmin is None: 
+            nminf = nbase.min()
+            nmin = nbase[nbase > 0].min()
+            print(nminf, nmin)
+            nbase[nbase < 0] = nmin
+        else:
+            nminf = nbase.min()
+            nminp = nbase[nbase > 0].min()
+            nbase[nbase < 0] = nmin
+            print(nminf, nminp, nbase.min())
         if checkbase:
             nbase[uu<   D/lam21    ]=1e-10
             nbase[uu>Ns*D/lam21*1.3]=1e-10
@@ -248,12 +254,12 @@ class NoiseModel(base.NoiseModel):
 
 
 class ThermalNoise(base.NoiseModel):
-    def __init__(self, pm, aa, seed=100, att='reas', limk = None, spread=1., hex=True, Ns=256, checkbase=True):
+    def __init__(self, pm, aa, seed=100, att='reas', limk = None, spread=1., hex=True, Ns=256, checkbase=True, nmin=None):
         self.pm = pm
         self.aa = aa
         self.zz = 1/aa-1
         self.seed = seed
-        self.noise = lambda k, mu: thermal_n(k, mu, self.zz, att=att, spread=spread, hex=hex, Ns=Ns, checkbase=checkbase)
+        self.noise = lambda k, mu: thermal_n(k, mu, self.zz, att=att, spread=spread, hex=hex, Ns=Ns, checkbase=checkbase, nmin=nmin)
         self.limk = limk
         self.spread = spread
         self.hex = hex

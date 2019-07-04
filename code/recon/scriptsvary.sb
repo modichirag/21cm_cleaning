@@ -1,52 +1,56 @@
 #!/bin/bash
 
-###for wopt in opt pess;
-##for wopt in opt;
-##do
-##    #for topt in opt pess reas;
-##    for topt in reas;
-##    #for topt in reas;
-##    do
-##	for aa in  0.3333 0.1429 0.2000;
-##	do
-##	    for spread in  1;
-##	    do
-##		echo
-##		echo Doing for $wopt $topt $aa
-##		echo
-##		sed -i "/wopt/s/.*/    wopt : $wopt/" ./params/paramsvary.yml
-##		sed -i "/stage2/s/.*/    stage2 : $topt/" ./params/paramsvary.yml
-##		sed -i "/aa/s/.*/    aa : $aa/" ./params/paramsvary.yml
-##		sed -i "/spread/s/.*/    spread : $spread/" ./params/paramsvary.yml
-##		echo
-##		cat ./params/paramsvary.yml;
-##		echo
-##		echo
-##		srun -n 256 python -u recon-wedgeHI.py ./params/paramsvary.yml
-##		done;
-##	 done;
-##    done;
-##done;
-##       
-##
-
-
 #for wopt in opt pess;
-for kmin in 0.01 0.05;
+for wopt in opt;
+#for wopt in pess;
 do
-
+    #for topt in opt pess reas;
+    for topt in opt reas;
+    #for topt in reas;
+    do
+	#for aa in  0.3333 0.1429 0.2000;
+	for aa in  0.1429;
+	do
+	    for spread in  1;
+	    do
 		echo
-
+		echo Doing for $wopt $topt $aa
 		echo
-		sed -i "/kmin/s/.*/    kmin : $kmin/" ./params/paramsvary.yml
-
+		sed -i "/wopt/s/.*/    wopt : $wopt/" ./params/paramsvary.yml
+		sed -i "/stage2/s/.*/    stage2 : $topt/" ./params/paramsvary.yml
+		sed -i "/aa/s/.*/    aa : $aa/" ./params/paramsvary.yml
+		sed -i "/spread/s/.*/    spread : $spread/" ./params/paramsvary.yml
 		echo
 		cat ./params/paramsvary.yml;
 		echo
 		echo
-		srun -n 256 python -u recon-wedgeHI.py ./params/paramsvary.yml
+		#mpirun -n 16 python -u stdrecon-wedgeHI.py ./params/paramsvary.yml 0
+		#mpirun -n 16 python -u stdrecon-wedgeHI.py ./params/paramsvary.yml 1
+		srun -n 64 python -u stdrecon-wedgeHI.py ./params/paramsvary.yml 1
 		done;
 	 done;
     done;
 done;
        
+
+
+
+##for wopt in opt pess;
+###for kmin in 0.01 0.05;
+##do
+##
+##		echo
+##
+##		echo
+##		sed -i "/wopt/s/.*/    wopt : $wopt/" ./params/paramsvary.yml
+##		echo
+##		cat ./params/paramsvary.yml;
+##		echo
+##		echo
+##		srun -n 256 python -u recon-wedgeHIf8.py ./params/paramsvary.yml
+##		#mpirun -n 8 python -u recon-wedgeHIf8.py ./params/paramsvary.yml
+##		done;
+##	 done;
+##    done;
+##done;
+##       

@@ -11,6 +11,7 @@ from cosmo4d import mapnoise
 from cosmo4d import map3d
 from cosmo4d import mapfinal
 from cosmo4d import mapbias
+from cosmo4d import standardrecon as std
 
 ##
 from cosmo4d import report

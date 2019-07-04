@@ -3,18 +3,21 @@ mods:
     map : mapbias
 
 basep:
-    bs : 256
-    nc : 128
+    bs : 1024
+    nc : 256
     seed : 100
     nsteps : 5
     B : 1
-    aa : 1.000
+    aa : 0.2000
     pmdisp : False
-    masswt : True
-    nfsteps : 40
     numd : -1
     noisevar : 0.01
-    rsdpos : False
+    rsdpos : True
+    prefix : null
+    stage2 : reas
+    spread : 1
+    ray : True
+    hex : True
 
 
 init: 

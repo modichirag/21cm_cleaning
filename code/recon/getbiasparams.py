@@ -1,10 +1,17 @@
 import numpy
 from scipy.optimize import minimize
-from nbodykit.lab import FFTPower
-
 import matplotlib.pyplot as plt
-plt.switch_backend('agg')
-import warnings
+
+from pmesh.pm import ParticleMesh
+from scipy.interpolate import InterpolatedUnivariateSpline as ius
+from nbodykit.lab import BigFileMesh, BigFileCatalog, FFTPower
+from nbodykit.cosmology import Planck15, EHPower, Cosmology
+
+import sys
+sys.path.append('../utils/')
+import tools, za
+cosmodef = {'omegam':0.309167, 'h':0.677, 'omegab':0.048}
+cosmo = Cosmology.from_dict(cosmodef)
 
 
 #########################################
@@ -123,8 +130,6 @@ def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20):
     if doed: mod += ed
     
     return params, mod
-
-
 
 
 
@@ -276,3 +281,80 @@ def getbiask(pm, hmesh, basemesh, pos, grid, fpos=None):
     
     return k, paramsk, mod
 
+         
+
+
+if __name__=="__main__":
+
+    #bs, nc = 256, 128
+    bs, nc = 1024, 512
+    model = 'ModelA'
+    ik = 50
+    ii = 50
+    ffile = '../../data/bparams-L%04d-N%04d-%s.txt'%(bs, nc, model)
+    header = 'b1, b2, bg, b0, bk \nFit bias upto 0.3\nFit tf upto 1.0'
+    pm = ParticleMesh(BoxSize=bs, Nmesh=[nc, nc, nc])
+    rank = pm.comm.rank
+    grid = pm.mesh_coordinates()*bs/nc
+    
+    lin = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/cm_lowres/5stepT-B1/%d-%d-9100/linear'%(bs, nc), 'LinearDensityK').paint()
+
+    tosave = []
+
+    for aa in [0.1429, 0.2000, 0.3333]:
+        zz = 1/aa-1
+        print(aa)
+        dyn = BigFileCatalog('/global/cscratch1/sd/chmodi/m3127/cm_lowres/5stepT-B1/%d-%d-9100/fastpm_%0.4f/1'%(bs, nc, aa))
+        hmesh = BigFileMesh('/global/cscratch1/sd/chmodi/m3127/H1mass/highres/%d-9100/fastpm_%0.4f/HImesh-N%04d/'%(bs*10, aa, nc), model).paint()
+        fpos = dyn['Position']
+        dgrow = cosmo.scale_independent_growth_factor(zz)
+        zapos = za.doza(lin.r2c(), grid, z=zz, dgrow=dgrow)
+
+        ph = FFTPower(hmesh, mode='1d').power
+        k, ph = ph['k'],  ph['power']
+        ik = numpy.where(k>0.3)[0][0]
+        
+        paramsza, zamod = getbias(pm, basemesh=lin, hmesh=hmesh, pos=zapos, grid=grid, ik=ik)
+        pmod = FFTPower(zamod, mode='1d').power['power']
+        tf = (pmod/ph)**0.5
+        if rank == 0: print(tf)
+        if rank == 0: print(paramsza)
+        
+        plt.figure()
+        for i, kk in enumerate([0.4, 0.5, 0.6, 0.7, min(1, k.max()-0.01)]):
+            ii = numpy.where(k > kk)[0][0]
+            if rank == 0: print(ii)
+            def ftomin(bb, ii=ii):
+                b0, b1, b2 = bb
+                b1 = 0 
+                pred = b0 + b1*k*1 + b2*k**2
+                chisq = (((tf-pred)[1:ii])**2).sum()**0.5.real
+                return chisq.real
+
+            params =  minimize(ftomin, [1, 0, 0]).x
+            if rank == 0: print(kk, params)
+            plt.plot(k, (params[0]+params[1]*k**2 )/tf, 'C%d--'%i, label=kk)
+
+        tosave.append([aa, *paramsza, *params])
+        for i, kk in enumerate([0.4, 0.5, 0.6, 0.7, min(1, k.max()-0.01)]):
+            ii = numpy.where(k > kk)[0][0]
+            if rank == 0: print(ii)
+            def ftomin(bb, ii=ii):
+                b0, b1, b2 = bb
+                b0 = 1
+                b1 = 0
+                pred = b0 + b1*k*1 + b2*k**2
+                chisq = (((tf-pred)[1:ii])**2).sum()**0.5.real
+                return chisq.real
+
+            params =  minimize(ftomin, [1, 0, 0]).x
+            if rank == 0: print(kk, params)
+            plt.plot(k, (params[0]+params[1]*k**2 )/tf, 'C%d'%i, label=kk)
+        
+        plt.legend()
+        plt.ylim(0.8, 1.2)
+        plt.semilogx()
+        plt.grid(which='both')
+        if rank == 0: plt.savefig('z%0.2f.png'%zz)
+        
+        if rank == 0: numpy.savetxt(ffile, numpy.array(tosave), header=header, fmt='%0.4f')

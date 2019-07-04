@@ -1,9 +1,9 @@
 mods:
     objective : SmoothedFourierWedgeObjective
     map : mapbias
-    kmin : 0.05
+    kmin : 0.03
     angle : null
-    wopt : opt    
+    wopt : opt
     
 basep:
     bs : 1024
@@ -11,7 +11,7 @@ basep:
     seed : 100
     nsteps : 5
     B : 1
-    aa : 0.2000
+    aa : 0.1429
     pmdisp : False
     numd : -1
     noisevar : 0.01
@@ -21,10 +21,11 @@ basep:
     spread : 1
     ray : True
     hex : True
+    hirax : False
 
 ##init: 
 ##    sinit: null
-    kmin : 0.05
+##    kmin : 0.05
 ##    nit : 100
 ##    lit : 0
 ##    sml : 0.0

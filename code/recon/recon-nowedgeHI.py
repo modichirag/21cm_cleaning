@@ -42,15 +42,12 @@ with open(cfname, 'r') as ymlfile: cfg = yaml.load(ymlfile)
 for i in cfg['basep'].keys(): locals()[i] = cfg['basep'][i]
 zz = 1/aa-1
 
-truth_pm = ParticleMesh(BoxSize=bs, Nmesh=(nc, nc, nc), dtype='f8')
+truth_pm = ParticleMesh(BoxSize=bs, Nmesh=(nc, nc, nc), dtype='f4')
 comm = truth_pm.comm
 rank = comm.rank
-kmin, angle = cfg['mods']['kmin'], cfg['mods']['angle']
+kmin = cfg['mods']['kmin']
 h1model = HImodels.ModelA(aa)
-if angle is None:
-    angle = numpy.round(mapnoise.wedge(zz, att=cfg['mods']['wopt'], angle=True), 0)
-if rank == 0: 
-    print(angle)
+
 try: spread
 except : spread = 1.
 
@@ -66,26 +63,20 @@ proj = '/project/projectdirs/cosmosim/lbl/chmodi/cosmo4d/'
 if ray: dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100/'%(nsteps, B, bs, nc)
 else: dfolder = '/global/cscratch1/sd/chmodi/m3127/cm_lowres/%dstepT-B%d/%d-%d-9100-fixed/'%(nsteps, B, bs, nc)
 
-if cfg['mods']['angle'] is not None: ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_ang%0.2f/L%04d-N%04d/'%(aa, kmin, cfg['mods']['angle'], bs, nc)
-else: ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_%s/L%04d-N%04d/'%(aa, kmin, cfg['mods']['wopt'], bs, nc)
+#ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_%s/L%04d-N%04d/'%(aa, kmin, cfg['mods']['wopt'], bs, nc)
+ofolder = '/global/cscratch1/sd/chmodi/m3127/21cm_cleaning/recon/fastpm_%0.4f/wedge_kmin%.2f_ang%0.2f/L%04d-N%04d/'%(aa, kmin, cfg['mods']['angle'], bs, nc)
 if ray: ofolder = ofolder[:-1]+'-R/'
-#Experimental config
 if stage2 is not None:
     ofolder += 'thermal-%s/'%stage2
 if hex: ofolder = ofolder[:-1] + '-hex/'
 if spread != 1: ofolder = ofolder[:-1] + '-sp%.1f/'%spread
-if hirax : 
-    ofolder = ofolder[:-1] + '-hirax/'
-    Ndish = 32
-else: Ndish = 256
-#Dynamics config
 if pmdisp: 
     ofolder += 'T%02d-B%01d/'%(nsteps, B)
 else: ofolder += 'ZA/'
 if prefix is None:
     prefix = '_fourier'
     if rsdpos: prefix += "_rsdpos"
-#
+
 fname = 's999_h1massA%s'%prefix
 optfolder = ofolder + 'opt_%s/'%fname
 if truth_pm.comm.rank == 0: print('Output Folder is %s'%optfolder)
@@ -135,17 +126,14 @@ else: dynamic_model = ZAModel(cosmo, truth_pm, B=B, steps=stages)
 if rank == 0: print(dynamic_model)
 
 #noise
-if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, att=stage2,spread=spread, hex=hex, limk=2, Ns=Ndish)
-else: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=None, aa=aa, att=stage2,spread=spread, hex=hex, Ns=Ndish)
-wedge_noise_model = mapnoise.WedgeNoiseModel(pm=truth_pm, power=1, seed=100, kmin=kmin, angle=angle)
+if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=100, aa=aa, att=stage2,spread=spread, hex=hex)
+else: truth_noise_model = mapnoise.ThermalNoise(truth_pm, seed=None, aa=aa, att=stage2,spread=spread, hex=hex)
 #Create and save data if not found
 
 s_truth = BigFileMesh(dfolder + 'linear', 'LinearDensityK').paint()
 dyn = BigFileCatalog(dfolder + 'fastpm_%0.4f/1'%aa)
 dlayout = truth_pm.decompose(dyn['Position'])
 d_truth = truth_pm.paint(dyn['Position'], layout=dlayout)
-hmesh = truth_pm.create(mode='real', value=hmesh[...])
-s_truth = truth_pm.create(mode='real', value=s_truth[...])
 
 
 try: data_p = map.Observable.load(optfolder+'/datap')
@@ -159,10 +147,6 @@ except:
     data_n = truth_noise_model.add_noise(data_p)
     data_n.save(optfolder+'datan/')
 
-try: data_w = map.Observable.load(optfolder+'/dataw')
-except: 
-    data_w = wedge_noise_model.add_noise(data_n)
-    data_w.save(optfolder+'dataw/')
 
 if rank == 0: print('Data setup')
 
@@ -178,7 +162,7 @@ try:
 except Exception as e:
     mock_model_setup = map.MockModel(dynamic_model, rsdpos=rsdpos, rsdfac=rsdfac)
     fpos, linear, linearsq, shear = mock_model_setup.get_code().compute(['xp', 'linear', 'linearsq', 'shear'], init={'parameters': s_truth})
-    grid = truth_pm.generate_uniform_particle_grid(shift=0.0, dtype='f8')
+    grid = truth_pm.generate_uniform_particle_grid(shift=0.0, dtype='f4')
     params, bmod = getbias(truth_pm, hmesh, [linear, linearsq, shear], fpos, grid)
     if rank ==0: numpy.savetxt(optfolder + '/params.txt', params, header='b1, b2, bsq')
     title = ['%0.3f'%i for i in params]
@@ -266,7 +250,8 @@ for Ns in sms:
             run += '-nit_%d-sm_%.2f'%(iiter, smoothings[ir])
             maxiter = lit
     if maxiter > 0:
-        obj = objfunc(mock_model, truth_noise_model, data_n, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, angle=angle, ivarmesh=ivarmesh)
+        if cfg['mods']['objective'] ==  'SmoothedFourierWedgeObjective': obj = objfunc(mock_model, truth_noise_model, data_n, prior_ps=ipk, error_ps=ipkerror, sml=sml, kmin=kmin, ivarmesh=ivarmeshj)
+        elif cfg['mods']['objective'] ==  'SmoothedFourierObjective':  obj = objfunc(mock_model, truth_noise_model, data_n, prior_ps=ipk, error_ps=ipkerror, sml=sml,  ivarmesh=ivarmesh)
         x0 = solve(N0, x0, rtol, run, Ns, prefix, mock_model, obj, data_p, truth_pm, optfolder, \
                saveit=20, showit=5, title=None, maxiter=maxiter)    
 

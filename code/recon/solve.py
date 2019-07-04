@@ -7,7 +7,7 @@ from abopt.algs.lbfgs import scalar as scalar_diag
 import os
 
 #optimizer
-def solve(Nmesh, x0, rtol, run, Nsm, prefix, mock_model, obj, data_p, truth_pm, optfolder, saveit=20, showit=5, title=None, maxiter=100, linesearchiter=20):
+def solve(Nmesh, x0, rtol, run, Nsm, prefix, mock_model, obj, data_p, truth_pm, optfolder, saveit=20, showit=5, title=None, maxiter=100, linesearchiter=100):
     
     pm = truth_pm.resize(Nmesh=(Nmesh, Nmesh, Nmesh))
     atol = pm.Nmesh.prod() * rtol

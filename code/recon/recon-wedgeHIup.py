@@ -51,8 +51,7 @@ if rank == 0:
 try: spread
 except : spread = 1.
 
-
-truth_pm = ParticleMesh(BoxSize=bs, Nmesh=(nc, nc, nc), dtype='f4')
+truth_pm = ParticleMesh(BoxSize=bs, Nmesh=(nc, nc, nc), dtype='f8')
 comm = truth_pm.comm
 rank = comm.rank
 
@@ -74,12 +73,17 @@ if stage2 is not None:
     ofolder += 'thermal-%s/'%stage2
 if hex: ofolder = ofolder[:-1] + '-hex/'
 if spread != 1: ofolder = ofolder[:-1] + '-sp%.1f/'%spread
+if hirax : 
+    ofolder = ofolder[:-1] + '-hirax/'
+    Ndish = 32
+else: Ndish = 256
+#Dynamics config
 if pmdisp: 
     ofolder += 'T%02d-B%01d/'%(nsteps, B)
 else: ofolder += 'ZA/'
 if prefix is None:
     prefix = '_fourier'
-    if rsdpos: prefix += "_rsdpos_2"
+    if rsdpos: prefix += "_rsdpos"
 
 fname = 's999_h1massA%s'%prefix
 optfolder = ofolder + 'opt_%s/'%fname
@@ -92,7 +96,7 @@ for folder in [ofolder, optfolder]:
 
 ####################################
 
-new_pm = ParticleMesh(BoxSize=truth_pm.BoxSize, Nmesh=truth_pm.Nmesh*2, dtype='f4')
+new_pm = ParticleMesh(BoxSize=truth_pm.BoxSize, Nmesh=truth_pm.Nmesh*2, dtype='f8')
 #####
 #Data
 if rsdpos:
@@ -137,8 +141,8 @@ else: dynamic_model = ZAModel(cosmo, new_pm, B=B, steps=stages)
 if rank == 0: print(dynamic_model)
 
 #noise
-if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(new_pm, seed=100, aa=aa, stage2=stage2,spread=spread, hex=hex)
-else: truth_noise_model = mapnoise.ThermalNoise(new_pm, seed=None, aa=aa, stage2=stage2,spread=spread, hex=hex)
+if stage2 is not None: truth_noise_model = mapnoise.ThermalNoise(new_pm, seed=100, aa=aa, att=stage2,spread=spread, hex=hex, limk=2, Ns=Ndish)
+else: truth_noise_model = mapnoise.ThermalNoise(new_pm, seed=None, aa=aa, att=stage2,spread=spread, hex=hex, Ns=Ndish)
 wedge_noise_model = mapnoise.WedgeNoiseModel(pm=new_pm, power=1, seed=100, kmin=kmin, angle=angle)
 #Create and save data if not found
 
@@ -203,7 +207,7 @@ if rank == 0: print('Setup done')
 smoothings = cfg['basep']['sms'][::-1]
 nsm = len(smoothings)
 
-outfolder = optfolder + '/upsample%d-nolimk/'%nsm
+outfolder = optfolder + '/upsample%d/'%nsm
 x0 =  optfolder + '/%d-%0.2f/best-fit/'%(nc, 0)
 inpath = None
 #if os.path.isdir(outfolder): 

@@ -88,8 +88,8 @@ class SmoothedFourierObjective(Objective):
         Objective.__init__(self, mock_model, noise_model, data, prior_ps)
         self.sml = sml
         self.error_ps = error_ps
-        self.ivarmesh = self.ivarmesh
-        if ivarmesh is not None: self.ivarmeshc = self.ivarmesh.r2c()
+        self.ivarmesh = ivarmesh
+        if self.ivarmesh is not None: self.ivarmeshc = self.ivarmesh.r2c()
 
     def get_code(self):
         import numpy

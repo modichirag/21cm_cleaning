@@ -201,5 +201,6 @@ def make_repwd2d_plot(Nmu=8):
 if __name__=="__main__":
     #make_rep_plot()
     #make_repwd_plot()
-    make_repwd2d_plot()
+    #make_repwd2d_plot()
+    make_repwd2d_plot(Nmu=3)
     #
