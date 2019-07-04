@@ -250,6 +250,7 @@ def make_repwd_plot():
                     elif ia == 1 and it == 0:
                         lbl = 'Wedge = %s'%wopt
                     else: lbl = None
+                    rpfit[0]['power'][rpfit[0]['k'] < args.kmin] = 0.
                     ax[0].plot(rpfit[0]['k'], rpfit[0]['power']/(rpfit[1]['power']*rpfit[2]['power'])**0.5, ls=lss, lw=1, color=cc, alpha=0.5)
                     ax[1].plot(rpfit[0]['k'], (rpfit[1]['power']/rpfit[2]['power'])**0.5, ls=lss, lw=1, color=cc, alpha=0.5)
                     ax[1].text(0.02, 1.2, r'$z = %.2f$'%zz,color='black',ha='left',va='bottom', fontdict=font)

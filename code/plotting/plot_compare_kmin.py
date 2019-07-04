@@ -109,7 +109,7 @@ def make_rep_plot():
     rpfit = rp.evaluate1(bfit, datapp, field='mapp')[:-2]
     lbl = 'All modes'
     axar[0].plot(rpfit[0]['k'], rpfit[0]['power']/(rpfit[1]['power']*rpfit[2]['power'])**0.5, ls='--', lw=lww, color=cc, label=lbl)
-    axar[1].plot(rpfit[0]['k'], (rpfit[1]['power']/rpfit[2]['power'])**0.5, ls=lss, lw=lww, color=cc)
+    axar[1].plot(rpfit[0]['k'], (rpfit[1]['power']/rpfit[2]['power'])**0.5, ls='--', lw=lww, color=cc)
 
     axis = axar[0]
     axis.set_ylabel('$r_{cc}$', fontdict=font)

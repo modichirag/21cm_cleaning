@@ -201,6 +201,9 @@ def make_mu_plot(Nmu=8, nx=2, ny=2):
                         axis.plot(mus, rcc, ls=lss, lw=2, color=cc, label=lbl, marker=mm)
                         if args.pp: axis.text(0.7, 0.41, r'$k = %.3f$'%(kk[i]),color='black',ha='left',va='bottom', fontdict=font)
                         else: axis.text(0.75, 0.15, r'$k = %.3f$'%(kk[i]),color='black',ha='left',va='bottom', fontdict=font)
+                        amu = np.sin(angle*np.pi/180.) 
+                        print(angle, amu)
+                        axis.axvline(amu, color=cc, ls=lss, lw=1, alpha=0.5)
                 except Exception as e: 
                     if rank == 0: print(e)
 
@@ -212,7 +215,7 @@ def make_mu_plot(Nmu=8, nx=2, ny=2):
         axis.axhline(1, ls="--", color='k')
         axis.set_xlim(-0.05, 1.05)
         axis.grid(which='both', lw=0.2, alpha=0.2, color='gray')
-        axis.legend(prop=fontmanage)
+        axis.legend(loc=3, prop=fontmanage)
         #axis.set_ylim(0.5, 1.05)
     # Put on some more labels.
     for axis in ax.flatten():
@@ -230,7 +233,7 @@ def make_mu_plot(Nmu=8, nx=2, ny=2):
 
 
 if __name__=="__main__":
-    make_rep_plot()
-    make_rep_plot(Nmu=8, nx=2, ny=4)
+    #make_rep_plot()
+    #make_rep_plot(Nmu=8, nx=2, ny=4)
     make_mu_plot()
     #
