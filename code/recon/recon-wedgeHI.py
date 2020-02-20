@@ -86,8 +86,10 @@ if prefix is None:
     prefix = '_fourier'
     if rsdpos: prefix += "_rsdpos"
 #
-fname = 's999_h1massA%s'%prefix
+initseed = 777
+fname = 's%d_h1massA%s'%(initseed, prefix)
 optfolder = ofolder + 'opt_%s/'%fname
+optfolder = optfolder[:-1] + 'iter200/'
 if truth_pm.comm.rank == 0: print('Output Folder is %s'%optfolder)
 
 
@@ -232,7 +234,7 @@ if inpath is not None:
     if rank == 0: print(inpath)
     s_init = BigFileMesh(inpath, 's').paint()
 else:
-    s_init = truth_pm.generate_whitenoise(777, mode='complex')\
+    s_init = truth_pm.generate_whitenoise(initseed, mode='complex')\
         .apply(lambda k, v: v * (ipk(sum(ki **2 for ki in k) **0.5) / v.BoxSize.prod()) ** 0.5)\
         .c2r()*0.001
     sms = [4.0, 2.0, 1.0, 0.5, 0.0]
@@ -256,7 +258,7 @@ for Ns in sms:
     #x0 = solve(N0, x0, 0.005, '%d-%0.2f'%(N0, Ns), Ns)
     sml = C * Ns
     rtol = 0.01
-    maxiter = 100
+    maxiter = 200
     run = '%d-%0.2f'%(N0, Ns)
     if Ns == sms[0]:
 #        if cfg['init']['sinit'] is not None: 

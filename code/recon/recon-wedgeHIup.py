@@ -85,8 +85,10 @@ if prefix is None:
     prefix = '_fourier'
     if rsdpos: prefix += "_rsdpos"
 
-fname = 's999_h1massA%s'%prefix
+initseed = 111
+fname = 's%d_h1massA%s'%(initseed, prefix)
 optfolder = ofolder + 'opt_%s/'%fname
+#optfolder = optfolder[:-1] + 'iter200/'
 if truth_pm.comm.rank == 0: print('Output Folder is %s'%optfolder)
 
 
