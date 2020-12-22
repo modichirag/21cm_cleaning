@@ -10,7 +10,7 @@ from cosmo4d import base
 from cosmo4d.engine import Literal
 from cosmo4d.pmeshengine import nyquist_mask
 from cosmo4d.iotools import save_map, load_map
-from cosmo4d.mapbias import Observable
+from cosmo4d.mapbias2 import Observable
 #
 from   astropy.cosmology import FlatLambdaCDM
 
@@ -127,16 +127,25 @@ def thermal_n(k, mu,zz,D=6.0,Ns=256,att='reas', spread=1, hex=True, checkbase=Tr
         uu   = kperp*chi/(2*np.pi)
         xx   = uu*lam21/Ns/D                # Dimensionless.
         nbase= n0*(c1+c2*xx)/(1+c3*xx**c4)*np.exp(-xx**c5) * lam21**2 + 1e-10
+        #nmin = nbase[nbase > 0].min()
+        #print(nmin)
+        #if nmin < 1e-3: nmin  = 1e-3
+        #nbase[nbase < 0] = nmin
         if nmin is None: 
-            nminf = nbase.min()
-            nmin = nbase[nbase > 0].min()
-            print(nminf, nmin)
+            try:
+                nminf = nbase.min()
+                nmin = nbase[nbase > 0].min()
+                print("nmin : ", nminf, nmin)
+            except Exception as e:
+                print('Exception in nmin : ', e)
+                nmin = 1e-10
             nbase[nbase < 0] = nmin
+            
         else:
             nminf = nbase.min()
             nminp = nbase[nbase > 0].min()
             nbase[nbase < 0] = nmin
-            print(nminf, nminp, nbase.min())
+            print("nmin : ", nminf, nminp, nbase.min())
         if checkbase:
             nbase[uu<   D/lam21    ]=1e-10
             nbase[uu>Ns*D/lam21*1.3]=1e-10
@@ -316,7 +325,11 @@ class ThermalNoise(base.NoiseModel):
             n = pm.generate_whitenoise(mode='complex', seed=self.seed)
             n = (n * (noisep / pm.BoxSize.prod()) ** 0.5 ).c2r(out=Ellipsis)
            #if pm.comm.rank == 0: print('Noise Variance check', (n ** 2).csum() / n.Nmesh.prod(), self.var)
-        return Observable(mapp=obs.mapp + n, s=obs.s, d=obs.d)
+        try:
+            mapp2=obs.mapp2
+            return Observable(mapp=obs.mapp + n, s=obs.s, d=obs.d, mapp2=obs.mapp2)
+        except:
+            return Observable(mapp=obs.mapp + n, s=obs.s, d=obs.d)
 
 
 class WedgeNoiseModel(base.NoiseModel):
