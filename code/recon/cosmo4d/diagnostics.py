@@ -2,16 +2,21 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 import warnings
 
-def evaluate(model, data):
+def evaluate(model, data, map2=False):
     from nbodykit.lab import FieldMesh, FFTPower, ProjectedFFTPower
 
-    #print('Means are : ', model.mapp.cmean(), data.mapp.cmean())
     if abs(model.mapp.cmean()) > 1e-3: modmappmean = model.mapp.cmean()
     else: modmappmean = 1.
     if abs(data.mapp.cmean()) > 1e-3: datmappmean = data.mapp.cmean()
     else: datmappmean = 1.
     modmappmean, datmappmean = 1., 1.
+    modmappmean2, datmappmean2 = 1., 1.
         
+#    try:
+#        data.mapp2.cmean()
+#        map2 = True        
+#    except: map2 = False
+#    
     xm = FFTPower(first=FieldMesh(model.mapp/modmappmean), second=FieldMesh(data.mapp/datmappmean), mode='1d')
     xd = FFTPower(first=FieldMesh(model.d), second=FieldMesh(data.d), mode='1d')
     xs = FFTPower(first=FieldMesh(model.s), second=FieldMesh(data.s), mode='1d')
@@ -24,8 +29,15 @@ def evaluate(model, data):
     pd2 = FFTPower(first=FieldMesh(data.d), mode='1d')
     ps2 = FFTPower(first=FieldMesh(data.s), mode='1d')
 
+    if map2 :
+        xm2 = FFTPower(first=FieldMesh(model.mapp2/modmappmean2), second=FieldMesh(data.mapp2/datmappmean2), mode='1d')
+        pm12 = FFTPower(first=FieldMesh(model.mapp2/modmappmean2), mode='1d')
+        pm22 = FFTPower(first=FieldMesh(data.mapp2/datmappmean2), mode='1d')
+
     data_preview = dict(s=[], d=[], mapp=[])
     model_preview = dict(s=[], d=[], mapp=[])
+    data_preview2 = dict(s=[], d=[], mapp=[])
+    model_preview2 = dict(s=[], d=[], mapp=[])
 
     for axes in [[1, 2], [0, 2], [0, 1]]:
         data_preview['d'].append(data.d.preview(axes=axes))
@@ -34,12 +46,27 @@ def evaluate(model, data):
         model_preview['d'].append(model.d.preview(axes=axes))
         model_preview['s'].append(model.s.preview(axes=axes))
         model_preview['mapp'].append(model.mapp.preview(axes=axes))
+        
+    if map2:
+        for axes in [[1, 2], [0, 2], [0, 1]]:
+            data_preview2['d'].append(data.d.preview(axes=axes))
+            data_preview2['s'].append(data.s.preview(axes=axes))
+            data_preview2['mapp'].append(data.mapp2.preview(axes=axes))
+            model_preview2['d'].append(model.d.preview(axes=axes))
+            model_preview2['s'].append(model.s.preview(axes=axes))
+            model_preview2['mapp'].append(model.mapp2.preview(axes=axes))
 
     #data_preview['mapp'] = data.mapp.preview(axes=(0, 1))
     #model_preview['mapp'] = model.mapp.preview(axes=(0, 1))
 
-    return xm.power, xs.power, xd.power, pm1.power, pm2.power, ps1.power, ps2.power, pd1.power, pd2.power, data_preview, model_preview
+    if map2:
+        return [xm.power, xs.power, xd.power, pm1.power, pm2.power, ps1.power, ps2.power, pd1.power, pd2.power, data_preview, model_preview], \
+            [xm2.power, xs.power, xd.power, pm12.power, pm22.power, ps1.power, ps2.power, pd1.power, pd2.power, data_preview2, model_preview2],
+    else: return xm.power, xs.power, xd.power, pm1.power, pm2.power, ps1.power, ps2.power, pd1.power, pd2.power, data_preview, model_preview
 
+
+
+    
 def save_report(report, filename, pm):
     xm, xs, xd, pm1, pm2, ps1, ps2, pd1, pd2, data_preview, model_preview = report
 
@@ -145,9 +172,12 @@ def save_report(report, filename, pm):
 
 
 
-def save_2ptreport(report, filename, pm):
+def save_2ptreport(report, filename, pm, report2=None):
     xm, xs, xd, pm1, pm2, ps1, ps2, pd1, pd2, data_preview, model_preview = report
-
+    if report2 is not None:
+        xm2, _, _, pm12, pm22, _, _, _, _, _, _ = report2
+        
+    
     from cosmo4d.iotools import create_figure
 
     km = xm['k']
@@ -159,10 +189,12 @@ def save_2ptreport(report, filename, pm):
         xm = xm['power'] / (pm1['power'] * pm2['power']) ** 0.5
         xs = xs['power'] / (ps1['power'] * ps2['power']) ** 0.5
         xd = xd['power'] / (pd1['power'] * pd2['power']) ** 0.5
+        if report2 is not None: xm2 = xm2['power'] / (pm12['power'] * pm22['power']) ** 0.5
 
         tm = (pm1['power'] / pm2['power']) **0.5
         ts = (ps1['power'] / ps2['power']) **0.5
         td = (pd1['power'] / pd2['power']) **0.5
+        if report2 is not None: tm2 = (pm12['power'] / pm22['power']) **0.5
 
         fig, gs = create_figure((10, 6), (2, 3))
         #fig, axar = plt.subplots(2, 3, figsize = (15, 8))
@@ -172,11 +204,12 @@ def save_2ptreport(report, filename, pm):
         ax.plot(ks, xs, label='intial', ls = "-", lw=1.5)
         ax.plot(kd, xd, label='final', ls = "--", lw=1.5)
         ax.plot(km, xm, label='map', ls = ":", lw=2)
+        if report2 is not None: ax.plot(km, xm2, label='map2', ls = "-.", lw=2)
         ax.legend()
         ax.set_ylim(0, 1.05)
         ax.minorticks_on()
         ax.set_xscale('log')
-        ax.grid(which='both', lw=0.1, color='gray')
+        ax.grid(which='both', lw=0.3, color='gray')
         ax.set_title('Cross coeff')
 
         #ax = axar[0, 1]
@@ -184,9 +217,10 @@ def save_2ptreport(report, filename, pm):
         ax.plot(ks, ts, label='intial', ls = "-", lw=1.5)
         ax.plot(kd, td, label='final', ls = "--", lw=1.5)
         ax.plot(km, tm, label='map', ls = ":", lw=2)
+        if report2 is not None: ax.plot(km, tm2, label='map2', ls = "-.", lw=2)
         ax.legend()
         ax.set_xscale('log')
-        ax.grid(which='both', lw=0.1, color='gray')
+        ax.grid(which='both', lw=0.3, color='gray')
         ax.set_title('Transfer func')
 
     #    ax = axar[0, 2]
@@ -198,7 +232,7 @@ def save_2ptreport(report, filename, pm):
         ax.text(0.05, 0.5, 'map=halos (sm)')
         ax.text(0.05, 0.3, 'model=FastPM+NN')
         ax.text(0.05, 0.1, 'data=FastPM+NN')
-        ax.grid(which='both', lw=0.1, color='gray')
+        ax.grid(which='both', lw=0.3, color='gray')
 
     #    ax = axar[1, 0]
         ax = fig.add_subplot(gs[1, 0])
@@ -208,7 +242,7 @@ def save_2ptreport(report, filename, pm):
         ax.set_yscale('log')
         ax.set_title("initial")
         ax.legend()
-        ax.grid(which='both', lw=0.1, color='gray')
+        ax.grid(which='both', lw=0.3, color='gray')
 
         #ax = axar[1, 1]
         ax = fig.add_subplot(gs[1, 1])
@@ -218,17 +252,21 @@ def save_2ptreport(report, filename, pm):
         ax.set_yscale('log')
         ax.set_title("final")
         ax.legend()
-        ax.grid(which='both', lw=0.1, color='gray')
+        ax.grid(which='both', lw=0.3, color='gray')
 
         #ax = axar[1, 2]
         ax = fig.add_subplot(gs[1, 2])
         ax.plot(km, pm1['power'], label='model')
         ax.plot(km, pm2['power'], label='data', ls = "--")
+        if report2 is not None:
+            ax.plot(km, pm1['power'], label='model2')
+            ax.plot(km, pm2['power'], label='data2', ls = "--")
+
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.set_title("map")
         ax.legend()
-        ax.grid(which='both', lw=0.1, color='gray')
+        ax.grid(which='both', lw=0.3, color='gray')
 
     fig.tight_layout()
     if pm.comm.rank == 0:

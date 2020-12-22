@@ -55,7 +55,7 @@ def shear(pm, base):
 
 
 
-def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20):
+def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20, fitshear=True, fitb2=True, retps=False):
 
     if pm.comm.rank == 0: print('Will fit for bias now')
 
@@ -68,7 +68,9 @@ def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20):
         s2 -= 1.*basemesh**2
         s2 -= s2.cmean()
 
-    ph = FFTPower(hmesh, mode='1d').power['power']
+
+    ph = FFTPower(hmesh, mode='1d').power
+    k, ph = ph['k'], ph['power']
 
     glay, play = pm.decompose(grid), pm.decompose(pos)
     ed0 = pm.paint(pos, mass=d0.readout(grid, layout = glay, resampler='nearest'), layout=play)
@@ -98,6 +100,10 @@ def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20):
 
     def ftomin(bb, ii=ik, retp = False):
         b1, b2, bs = bb
+        if not fitb2:
+            b2 = 0
+            bs = 0
+        if not fitshear: bs = 0
         pred = b1**2 *ped0 + b2**2*ped2 + 2*b1*b2*pxed0d2 
         pred += bs**2 *pes2 + 2*b1*bs*pxed0s2 + 2*b2*bs*pxed2s2
         if doed: pred += ped + 2*b1*pxedd0 + 2*b2*pxedd2 + 2*bs*pxeds2 
@@ -129,7 +135,12 @@ def getbias(pm, hmesh, basemesh, pos, grid, doed=False, fpos=None, ik=20):
         mod = b1*ed0 + b2*ed2 + bs2*es2
     if doed: mod += ed
     
-    return params, mod
+    if retps:
+        pmod = FFTPower(mod, mode='1d').power['power']
+        ps = [k, ph, pmod, ped0, ped2, pes2, pxed0d2, pxed0s2, pxed2s2]
+        return params, mod, ps
+    
+    else: return params, mod
 
 
 
@@ -287,7 +298,7 @@ def getbiask(pm, hmesh, basemesh, pos, grid, fpos=None):
 if __name__=="__main__":
 
     #bs, nc = 256, 128
-    bs, nc = 1024, 512
+    bs, nc = 1024, 256
     model = 'ModelA'
     ik = 50
     ii = 50
